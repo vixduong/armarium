@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# SessionStart context adapter installed by codebase-memory-mcp.
+# Fail-open: it never blocks or logs hook/prompt content.
+# Local patch 2026-11-13: cache the output per cwd. `hook-augment` costs ~300 ms per session start;
+# the cache stays valid until an index file (*.db) changes. `codebase-memory-mcp install --force` overwrites this file.
+BIN="$HOME/.local/bin/codebase-memory-mcp"
+[ -x "$BIN" ] || exit 0
+INPUT=$(cat)
+D="$HOME/.cache/codebase-memory-mcp"
+C="$D/hook-cache"
+cwd=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
+f="$C/$(printf '%s' "$cwd" | shasum | cut -c1-16).json"
+newest=$(ls -t "$D"/*.db 2>/dev/null | grep -v '/activity\.db$' | head -1)
+if [ -n "$cwd" ] && [ -s "$f" ] && [ "$f" -nt "$D" ] && { [ -z "$newest" ] || [ "$f" -nt "$newest" ]; }; then
+  cat "$f"
+  exit 0
+fi
+out=$(printf '%s' "$INPUT" | "$BIN" hook-augment 2>/dev/null)
+printf '%s' "$out"
+if [ -n "$cwd" ] && [ -n "$out" ]; then mkdir -p "$C" && printf '%s' "$out" > "$f"; fi 2>/dev/null
+exit 0

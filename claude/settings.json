@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "ENABLE_TOOL_SEARCH": "true",
+    "BASH_MAX_OUTPUT_LENGTH": "10000",
+    "MAX_MCP_OUTPUT_TOKENS": "10000",
+    "PONYTAIL_DEFAULT_MODE": "lite"
+  },
+  "permissions": {
+    "deny": [
+      "Read(**/.env)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "haiku",
+  "availableModels": [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-fable-5-2",
+    "claude-haiku-5-5"
+  ],
+  "skillOverrides": {
+    "caveman-review": "off",
+    "codebase-design": "off",
+    "security-audit": "off",
+    "verify-and-stop": "off",
+    "ask-matt": "off",
+    "grill-with-docs": "off",
+    "improve-codebase-architecture": "off",
+    "teach": "off",
+    "to-questionnaire": "off",
+    "wait-what": "off",
+    "triage": "off",
+    "setup-matt-pocock-skills": "off",
+    "codebase-memory": "off",
+    "implement-spec": "off"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/bash-ban-raw-tools",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/run-cli-hook rtk hook claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/cbm-subagent-reminder",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/memory-repo-symlink",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/cbm-session-reminder",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "worktree": {
+    "baseRef": "fresh"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true,
+    "context7@claude-plugins-official": true,
+    "humanizer@humanizer": true,
+    "context-mode@context-mode": true
+  },
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      },
+      "autoUpdate": false
+    },
+    "humanizer": {
+      "source": {
+        "source": "github",
+        "repo": "blader/humanizer"
+      },
+      "autoUpdate": false
+    },
+    "context-mode": {
+      "source": {
+        "source": "github",
+        "repo": "mksglu/context-mode"
+      },
+      "autoUpdate": false
+    }
+  },
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-fable-5-2": {
+      "effortLevel": "medium"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    },
+    "claude-haiku-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "high"
+    }
+  },
+  "advisorModel": "claude-opus-5-5",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
+  "editorMode": "normal",
+  "autoCompactEnabled": true,
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true
+}
