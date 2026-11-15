@@ -10,8 +10,8 @@ Write `Flow: <row>` before the first tool call, then follow that flow. Several d
 | UI page or component in a repo | Code flow + `~/.claude/rules/frontend.md` | `ui-ux-pro-max` | screenshots per frontend gate step 4 viewed |
 | Artifact, page, dashboard | Deliverable flow + frontend gate items 4, 5, 7 | `artifact-design`; chart or stat tile → `dataviz` | published, and the rendered page viewed at 375 px and desktop |
 | Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated |
-| Writing, doc, message | Deliverable flow | `humanizer` on the final text | reader + purpose named first; `humanizer` ran on the version delivered |
-| Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; line budget kept |
+| Writing, doc, message | Deliverable flow | `humanizer` on the final text | the intake note names reader and purpose (`file:line` or the message that says it); `humanizer` ran on the version delivered |
+| Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated |
 | Research | Deliverable flow | `research`, or `researcher` agent | each decision-relevant claim cites a source you opened; unverified claims listed |
 | Video | rendered by code → Code flow + `~/.claude/rules/video.md`; else Deliverable flow | `ui-ux-pro-max`; Remotion → `remotion-best-practices`; code review → `review-animations` | output probed · no blank frame · one frame per transition viewed · reading time fits every scene |
 | Claude Code settings, hooks, permissions | `update-config` | `update-config` | settings file parses (`jq empty`) |
@@ -53,7 +53,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
    - Diff Big → `reviewer` ← changed files + acceptance criteria (a plan or acceptance file another agent wrote counts as criteria). A spec or ticket a person wrote → `code-review` instead. Last open ticket of a spec → `code-review` on the whole spec range.
    - Untrusted input or auth/secrets → also a security review, whatever the size: `git remote` lists a remote → `security-review`; none (it needs `origin/HEAD`) → a separate `reviewer` call with a security-only prompt on the same diff, never folded into the general review.
    - Animation in the diff → also `review-animations`: UI per frontend gate step 6, rendered video per video gate step 5.
-   - Untrusted input or public API → `reviewer` at its default sonnet/high; a review that still missed a bug → `model: "opus"` per `~/.claude/agent-tuning.md`.
+   - Hard to undo (auth/permission, secrets, money, migration) → `reviewer` with `model: "opus"`, whatever the size. Other untrusted input or public API → its default sonnet/high; a review that still missed a bug → one tier up per `~/.claude/agent-tuning.md`.
    - Fix every P0/P1 → back to 7 → one P0-only re-check. Still P0 after 2 rounds → stop and report. P2 → list in the final reply.
 
 **New gate** for a stack or medium: `~/.claude/rules/<name>.md`, `paths:` frontmatter, first line `Invoke <skill> FIRST`, then a numbered self-check; add its row to Route.
@@ -62,8 +62,8 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 - **Code graph (CBM), optional**: its tools are deferred, so load first (`ToolSearch` `select:mcp__codebase-memory-mcp__<tool>`); `search_graph` → `trace_path` → `get_code_snippet`. `Transport closed` / `MCP error -32000` → same tool via `~/.local/bin/codebase-memory-mcp cli <tool>` (flags = schema args in kebab-case) in `ctx_execute(shell)`, or fall back to text search.
 - **Text search**: `Grep`/`Glob` when listed, else `grep -rn`/`find` inside `ctx_execute(shell)`.
 - **Run/read → context-mode**: `ctx_execute` prints only the answer (`file` for a big file/log); `ctx_batch` for >1 command; `ctx_search` for recall.
-- **Docs/web**: library/API docs → context7 first. Any URL → `ctx_index(url)` → `ctx_search`.
-- **Files**: file over ~5 KB → `Read` with `offset`+`limit` on the first call. Write files with `Edit`/`Write` only; Bash and `ctx_execute` never write a file, scratchpad and `/tmp` included (no heredoc, `python -`, `printf >>`, `cat >`, `tee`, `sed -i`).
+- **Docs/web**: library/API docs → context7 first.
+- **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either.
 - **Shell is zsh**: `$cmd` holding "pnpm ci" does not word-split (exit 127); call each command directly or use the repo script.
 - **RTK**: Bash runs as `rtk <cmd>`; unfiltered → `rtk proxy <cmd>`. Details: `~/.claude/RTK.md`.
 
@@ -82,4 +82,4 @@ Plain verbs, concrete nouns, numbers over adjectives. Answer first. Bullets > pr
 ## Context
 Post-`/compact`: re-discover tools via `ToolSearch`. Long task: checkpoint to auto-memory. Project `CLAUDE.md` overrides this file; read it and `architecture.md` before cross-cutting work.
 
-<!-- Edited 2026-11-15 from eval schools-v1/v2 (optional graph, R60/R62 wording, Exit = Skill call, UI motion → frontend gate 6). Verified targets (ls, 2026-11-15): ~/.claude/skills/{lean-build,tdd,surgical-patch,diagnosing-bugs,investigate-first,safe-refactor,migration,grill-me,wayfinder,to-spec,to-tickets,implement,code-review,ui-ux-pro-max,writing-for-agents,research,remotion-best-practices,review-animations}/SKILL.md · agents/{oracle,reviewer,worker,explorer,researcher,evidence-auditor}.md · rules/{frontend,video}.md · agent-tuning.md · RTK.md · CODING_STANDARDS.md · plugins/cache/humanizer · ~/.local/bin/codebase-memory-mcp. Built-in (session skill list, no ls): artifact-design, dataviz, update-config, security-review, Explore, Plan. -->
+<!-- Edited 2026-11-15 from eval schools-v1/v2 (optional graph, R60/R62 wording, Exit = Skill call, UI motion → frontend gate 6; then Reddit feedback: evidence-only Done-when, opus by undo risk, shell-write hook; see docs/rule-origins.md). Verified targets (ls, 2026-11-15): ~/.claude/skills/{lean-build,tdd,surgical-patch,diagnosing-bugs,investigate-first,safe-refactor,migration,grill-me,wayfinder,to-spec,to-tickets,implement,code-review,ui-ux-pro-max,writing-for-agents,research,remotion-best-practices,review-animations}/SKILL.md · agents/{oracle,reviewer,worker,explorer,researcher,evidence-auditor}.md · rules/{frontend,video}.md · agent-tuning.md · RTK.md · CODING_STANDARDS.md · plugins/cache/humanizer · ~/.local/bin/codebase-memory-mcp. Built-in (session skill list, no ls): artifact-design, dataviz, update-config, security-review, Explore, Plan. -->

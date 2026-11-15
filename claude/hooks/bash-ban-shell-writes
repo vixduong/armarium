@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+# (no -I in the shebang: Linux env takes "python3 -I" as one name. Safe without it: a script run by path
+# imports from its own folder, ~/.claude/hooks, not from the session's working directory.)
+# PreToolUse Bash gate: block file writes from the shell (heredoc into a file, echo/printf/cat > file,
+# sed -i, perl -i, tee, a python script fed on stdin). CLAUDE.md: write files with Edit/Write only.
+# Added 2026-11-15: eval run 2 (docs/rule-origins.md in armarium) measured 5/8 compliance with the prose rule and 0 blocks by any hook.
+# Allowed on purpose: heredoc into a command (git commit -F -), log redirects (make check > log 2>&1),
+# fd redirects, /dev/null. Escape hatch (same as bash-ban-raw-tools): touch /tmp/bash-raw-unlock-$PPID.
+# Self-test: python3 -I ~/.claude/hooks/test_bash_ban_shell_writes.py
+import json, os, re, sys, time
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)  # malformed input must not block work
+if data.get("tool_name") != "Bash":
+    sys.exit(0)
+unlock = "/tmp/bash-raw-unlock-%d" % os.getppid()
+try:
+    if 0 <= time.time() - os.stat(unlock).st_mtime < 600:
+        sys.exit(0)
+except OSError:
+    pass
+
+cmd = (data.get("tool_input") or {}).get("command") or ""
+
+# Drop heredoc bodies: their text is data, not shell.
+kept, delim = [], None
+for line in cmd.split("\n"):
+    if delim is not None:
+        if line.strip() == delim:
+            delim = None
+        continue
+    kept.append(line)
+    m = re.search(r"<<-?\s*['\"]?(\w+)['\"]?", line)
+    if m:
+        delim = m.group(1)
+text = "\n".join(kept)
+# Quoted strings are data too (commit messages, sed scripts).
+text = re.sub(r"'[^']*'", "''", text)
+text = re.sub(r'"[^"]*"', '""', text)
+
+SAFE = {"/dev/null", "/dev/stderr", "/dev/stdout"}
+WRITERS = {"echo", "printf", "cat"}
+
+
+def file_targets(seg):
+    # `> f` / `>> f`, not fd redirects (2>, &>, >&2)
+    return [t for t in re.findall(r"(?<![0-9&>])>>?\s*([^\s&|;<>]+)", seg) if t not in SAFE and not t.startswith("&")]
+
+
+def words(seg):
+    w = seg.split()
+    while w and (re.match(r"^\w+=", w[0]) or w[0] in ("rtk", "proxy", "command", "builtin", "env")):
+        w = w[1:]
+    return w
+
+
+reason = None
+for seg in re.split(r"\|\||&&|;|\||\n", text):
+    w = words(seg)
+    if not w:
+        continue
+    head = os.path.basename(w[0])
+    targets = file_targets(seg)
+    heredoc = "<<" in seg
+    if head in WRITERS and targets:
+        reason = "'%s > %s'" % (head, targets[0])
+    elif heredoc and targets:
+        reason = "heredoc into '%s'" % targets[0]
+    elif head in ("sed", "gsed") and any(re.match(r"^-[A-Za-z]*i", a) or a.startswith("--in-place") for a in w[1:]):
+        reason = "'sed -i'"
+    elif head == "perl" and any(re.match(r"^-[A-Za-z]*i", a) for a in w[1:]):
+        reason = "'perl -i'"
+    elif head == "tee" and any(a not in SAFE and not a.startswith("-") for a in w[1:]):
+        reason = "'tee'"
+    elif re.match(r"^python[0-9.]*$", head) and ("-" in w[1:] or heredoc):
+        reason = "a python script on stdin"
+    if reason:
+        break
+
+if not reason:
+    sys.exit(0)
+sys.stderr.write(
+    "BLOCKED: %s writes a file from Bash. Write files with the Write tool (new file) or Edit (change). "
+    "For a script, Write it to the scratchpad, then run it with `python3 -I <path>`.\n" % reason
+)
+sys.exit(2)
