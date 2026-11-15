@@ -21,7 +21,7 @@ claude/                      mirrors ~/.claude
 ├── CODING_STANDARDS.md      judgement calls a linter cannot make
 ├── RTK.md                   how to read condensed command output
 ├── agent-tuning.md          why each agent has its model and effort
-├── settings.json            env, permissions, hooks, plugins, models
+├── settings.example.json    opt-in: env, permissions, hooks, plugins, models
 ├── statusline-command.sh    status line: tokens, cost, limits
 ├── agents/                  oracle, reviewer, worker, tester, explorer,
 │                            researcher, evidence-auditor
@@ -32,8 +32,9 @@ docs/
 └── rule-origins.md          the incident and evidence behind each rule
 ```
 
-Hooks:
+Hooks (each runs only once its entry from `settings.example.json` is in your `settings.json`):
 
+- `agent-no-downgrade` blocks an `Agent` call whose `model` is below that agent's frontmatter model, except the drops listed in `agent-tuning.md`. Self-test: `python3 -I hooks/test_agent_no_downgrade.py`.
 - `bash-ban-raw-tools` blocks raw `cat`, `head`, `tail`, `find`, `grep`, `rg` and `wc` in Bash and points to the dedicated tools. A temporary unlock file lasts 10 minutes.
 - `bash-ban-shell-writes` blocks file writes from Bash: a heredoc into a file, `echo`/`printf`/`cat > file`, `sed -i`, `perl -i`, `tee`, and a python script fed on stdin. It lets through a heredoc into a command (`git commit -F -`), log redirects (`make check > log 2>&1`) and `/dev/null`. It shares the unlock file with `bash-ban-raw-tools`. Self-test: `python3 -I hooks/test_bash_ban_shell_writes.py`.
 - `run-cli-hook` finds a CLI such as `rtk` when the hook environment has no PATH, and exits 0 if it is not installed.
@@ -49,15 +50,15 @@ The files above call out to other projects. None of them are copied here.
 | What | Used by | Where to get it |
 |---|---|---|
 | `jq` | hooks | `brew install jq` |
-| `python3` | `bash-ban-shell-writes` | preinstalled on macOS; your package manager elsewhere |
-| `rtk` | `settings.json` hook, `RTK.md` | `brew install rtk` ([rtk-ai.app](https://www.rtk-ai.app/)) |
+| `python3` | `bash-ban-shell-writes`, `agent-no-downgrade` | preinstalled on macOS; your package manager elsewhere |
+| `rtk` | `settings.example.json` hook, `RTK.md` | `brew install rtk` ([rtk-ai.app](https://www.rtk-ai.app/)) |
 | `codebase-memory-mcp` | cbm hooks, the optional code graph in `CLAUDE.md` | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp), install script in its README |
-| `ponytail` plugin | `settings.json` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
-| `humanizer` plugin | `settings.json`, writing flow | [blader/humanizer](https://github.com/blader/humanizer) |
-| `context-mode` plugin | `settings.json`, tool rules | [mksglu/context-mode](https://github.com/mksglu/context-mode) |
-| `context7` plugin | `settings.json`, docs lookups | `claude-plugins-official` marketplace |
+| `ponytail` plugin | `settings.example.json` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
+| `humanizer` plugin | `settings.example.json`, writing flow | [blader/humanizer](https://github.com/blader/humanizer) |
+| `context-mode` plugin | `settings.example.json`, tool rules | [mksglu/context-mode](https://github.com/mksglu/context-mode) |
+| `context7` plugin | `settings.example.json`, docs lookups | `claude-plugins-official` marketplace |
 
-`settings.json` already lists the marketplaces and enables the plugins. If one is missing after you copy it, add it with `/plugin marketplace add <owner/repo>` and then `/plugin install`.
+`settings.example.json` lists the marketplaces and enables the plugins. If one is missing after you merge it, add it with `/plugin marketplace add <owner/repo>` and then `/plugin install`.
 
 Skills named in `CLAUDE.md`:
 
@@ -81,11 +82,11 @@ cd armarium
 cp -Ri claude/. ~/.claude/
 ```
 
-`-i` asks before each overwrite. If you already have a `settings.json`, merge it by hand instead of replacing it. Then install the requirements above.
+`-i` asks before each overwrite. The copy leaves your `settings.json` alone: the repo ships only `settings.example.json`, so nothing changes your permissions until you choose to. Then install the requirements above.
+
+Settings are opt-in. `settings.example.json` sets `defaultMode` to `auto` and turns on `skipDangerousModePermissionPrompt` and `skipAutoPermissionPrompt`, so Claude Code stops asking before many actions. It also pins my model choices (`haiku` as default, `claude-opus-5-5` as advisor). Copy into your own `settings.json` only the blocks you want, at least the `hooks` block if you want the hooks to run.
 
 ## Read before you copy
-
-- `settings.json` sets `defaultMode` to `auto` and turns on `skipDangerousModePermissionPrompt` and `skipAutoPermissionPrompt`. That suits how I work, and it may not suit you. It also pins my model choices (`haiku` as default, `claude-opus-5-5` as advisor).
 - `CODING_STANDARDS.md` came from a larger project. It mentions `enforcement.md`, rule IDs such as R07 and AC-05, and a `--wb-*` token set, none of which are in this repo. Treat those as examples to rewrite.
 - `CLAUDE.md` points at `~/.claude/commands/`, `~/.claude/skills/` and `~/.claude/projects/`. Those are folders on my machine, not files in this repo.
 - I run macOS and zsh, and I have not tested any of this on Linux or Windows.

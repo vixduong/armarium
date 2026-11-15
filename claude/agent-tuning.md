@@ -19,6 +19,8 @@ Effort (`low` → `medium` → `high` → `xhigh` → `max`) buys depth, not kno
 
 Checkable batch → run everything at `low`, re-run only the failures at `high`. Past `high`, one more effort level can cost as much as the next model: test the next model at a lower effort first (Opus past `high` → Fable at `high`).
 
+**Escalate only.** A per-call `model` raises an agent's tier, never lowers it; the only drops are the "Drop when" cells, used when their condition holds and named in the report. A review moved to a cheap tier fails silently: you see it only as the bug it missed. The hook `agent-no-downgrade` blocks any other drop.
+
 ## Per agent
 | Agent | Default | Why | Raise when | Drop when |
 |---|---|---|---|---|

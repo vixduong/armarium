@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+# PreToolUse Agent gate: a per-call `model` may raise an agent's tier, never lower it, except the drops that
+# agent-tuning.md lists in its "Drop when" column. Agents whose default model is unknown (no frontmatter
+# file, `inherit`) pass. Reason: a review handed to a cheap model shows up only as the bug it missed.
+# Self-test: python3 -I ~/.claude/hooks/test_agent_no_downgrade.py
+import json, os, re, sys
+
+RANK = {"haiku": 0, "sonnet": 1, "opus": 2, "fable": 3}
+# agent -> tiers it may drop to (agent-tuning.md "Drop when"); keep in step with that file
+ALLOWED_DROPS = {"worker": {"haiku"}, "oracle": {"opus", "sonnet"}}
+
+
+def tier(name):
+    name = (name or "").lower()
+    for t in RANK:
+        if t in name:
+            return t
+    return None
+
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+if data.get("tool_name") != "Agent":
+    sys.exit(0)
+inp = data.get("tool_input") or {}
+agent, asked = inp.get("subagent_type") or "", tier(inp.get("model"))
+if not agent or asked is None or not re.match(r"^[\w.-]+$", agent):
+    sys.exit(0)
+
+path = os.path.join(os.path.expanduser("~/.claude/agents"), agent + ".md")
+try:
+    head = open(path, encoding="utf-8").read(2000)
+except OSError:
+    sys.exit(0)
+m = re.search(r"^model:\s*(\S+)", head, re.M)
+default = tier(m.group(1)) if m else None
+if default is None or RANK[asked] >= RANK[default] or asked in ALLOWED_DROPS.get(agent, set()):
+    sys.exit(0)
+
+sys.stderr.write(
+    "BLOCKED: `%s` runs on %s by default; a per-call model may only go up (agent-tuning.md). "
+    "Drop the `model` argument, or raise it if the task is harder.\n" % (agent, default)
+)
+sys.exit(2)
