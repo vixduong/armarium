@@ -1,0 +1,13 @@
+#!/bin/bash
+# SessionStart: warn when Code Mode is on but ponytail's band mod is registered again.
+# The band (a JS mod that checks tool calls) makes Code Mode fall back to ordinary tools; the owner
+# removed it from the plugin cache on 2026-11-16, and a ponytail update restores it.
+# Fail-open: any missing file or tool → silent exit 0.
+[ "${CLAUDE_CODE_EXPERIMENTAL_CODE_MODE:-}" = "1" ] || exit 0
+REG="$HOME/.claude/plugins/installed_plugins.json"
+dir=$(jq -r '.plugins["ponytail@ponytail"][0].installPath // empty' "$REG" 2>/dev/null)
+[ -n "$dir" ] || exit 0
+jq -e '.hooks | (if type == "array" then . else [.] end) | any(tostring | test("claude-band"))' \
+  "$dir/.claude-plugin/plugin.json" >/dev/null 2>&1 || exit 0
+printf '{"systemMessage":"Code Mode is on, but ponytail %s registers its band mod again, so Code Mode falls back to ordinary tools. Remove \\"./hooks/claude-band.json\\" from %s/.claude-plugin/plugin.json."}\n' \
+  "$(basename "$dir")" "$dir"

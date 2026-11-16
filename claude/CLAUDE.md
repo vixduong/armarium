@@ -9,7 +9,7 @@ Write `Flow: <row>` before the first tool call, then follow that flow. Several d
 | Plan or spec only (someone else codes) | Code flow steps 1, 3, 4; the plan file replaces plan mode | per step 1 | plan names every file, the gate command, and independent acceptance checks |
 | UI page or component in a repo | Code flow + `~/.claude/rules/frontend.md` | `ui-ux-pro-max` | screenshots per frontend gate step 4 viewed |
 | Artifact, page, dashboard | Deliverable flow + frontend gate items 4, 5, 7 | `artifact-design`; chart or stat tile → `dataviz` | published, and the rendered page viewed at 375 px and desktop |
-| Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated |
+| Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated · a `reviewer` call re-derived the headline numbers and claims from the raw data |
 | Writing, doc, message | Deliverable flow | `humanizer` on the final text | the intake note names reader and purpose (`file:line` or the message that says it); `humanizer` ran on the version delivered |
 | Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated |
 | Research | Deliverable flow | `research`, or `researcher` agent | each decision-relevant claim cites a source you opened; unverified claims listed |
@@ -63,7 +63,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 - **Text search**: `Grep`/`Glob` when listed, else `grep -rn`/`find` inside `ctx_execute(shell)`.
 - **Run/read → context-mode**: `ctx_execute` prints only the answer (`file` for a big file/log); `ctx_batch` for >1 command; `ctx_search` for recall.
 - **Docs/web**: library/API docs → context7 first.
-- **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either.
+- **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either. A file you must read whole (to rewrite or humanize it) → `Read` with `offset`/`limit`: context-mode folds a bare Read over 2 KB into a search pointer.
 - **Shell is zsh**: `$cmd` holding "pnpm ci" does not word-split (exit 127); call each command directly or use the repo script.
 - **RTK**: Bash runs as `rtk <cmd>`; unfiltered → `rtk proxy <cmd>`. Details: `~/.claude/RTK.md`.
 

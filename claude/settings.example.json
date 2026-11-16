@@ -4,7 +4,8 @@
     "ENABLE_TOOL_SEARCH": "true",
     "BASH_MAX_OUTPUT_LENGTH": "10000",
     "MAX_MCP_OUTPUT_TOKENS": "10000",
-    "PONYTAIL_DEFAULT_MODE": "lite"
+    "PONYTAIL_DEFAULT_MODE": "lite",
+    "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1"
   },
   "permissions": {
     "deny": [
@@ -43,7 +44,7 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/agent-no-downgrade",
-            "timeout": 5
+            "timeout": 15
           }
         ]
       },
@@ -53,17 +54,17 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/bash-ban-raw-tools",
-            "timeout": 5
+            "timeout": 15
           },
           {
             "type": "command",
             "command": "~/.claude/hooks/bash-ban-shell-writes",
-            "timeout": 5
+            "timeout": 15
           },
           {
             "type": "command",
             "command": "~/.claude/hooks/run-cli-hook rtk hook claude",
-            "timeout": 5
+            "timeout": 15
           }
         ]
       }
@@ -91,6 +92,11 @@
             "type": "command",
             "command": "~/.claude/hooks/cbm-session-reminder",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/codemode-ponytail-band",
+            "timeout": 5
           }
         ]
       }

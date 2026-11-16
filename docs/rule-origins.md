@@ -23,6 +23,17 @@ Rules with no recorded origin are not listed yet. Add a row whenever you add or 
 | Shell writes blocked by a hook (`hooks/bash-ban-shell-writes`, `CLAUDE.md` Tools) | The prose rule "write files with Edit/Write only" was followed 5 of 8 times; no hook enforced it. Without the rule, agents wrote 36 and 24 files through heredocs | run 2 full arm, run 1 bare arm | New hook blocks heredoc-into-file, `echo`/`printf`/`cat > file`, `sed -i`, `perl -i`, `tee`, and python on stdin. The prose line now only says what to use instead |
 | Lines a hook already enforces removed (`CLAUDE.md` Tools) | "Read big files with offset" and "URL → `ctx_index`" are both blocked by the context-mode plugin's hooks | both blocks seen in normal sessions | Lines deleted |
 
+## Changed after the Code Mode eval
+
+A separate eval on 2026-11-16 compared Code Mode off and on: 5 small synthetic tasks, 2 runs per arm (5 for the `.env` task), 26 interactive Sonnet sessions in auto mode.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| PreToolUse hook timeouts 15s (`settings.example.json`) | Under Code Mode, a PreToolUse hook that times out refuses the call even without `onFailure`, and every Bash call runs four hooks in series at 5s each | Code Mode docs, "Tool call refused by a hook"; 0 hook failures in 26 sessions at 15s | `timeout` 5 → 15 on the four PreToolUse hooks |
+| Code Mode on, ponytail band watched (`settings.example.json` env, `hooks/codemode-ponytail-band`) | Code Mode would not start while ponytail's band mod was registered. With it removed: about 17% lower cost (cache read −33%, output −44%), 3 parallel commands in 18.5s instead of 35.6s, same pass rate. The band removal lives in the plugin cache, so an update undoes it silently | all 5 tasks passed in both arms; smoke runs with and without the band | Env var set; a session-start hook warns when the band is back |
+| Report: a `reviewer` re-derives the headline numbers (`CLAUDE.md` Route, Report row) | The eval report nearly shipped with a doubled block count, a denial count stuck at 0, a "30% saving" that was mostly cheap cache reads (about 17% by cost), a wrong cause for the `.env` leak, and a fix that needs a sandbox the config does not enable. The author caught the first two; an outside review caught the rest | `code-mode-v1/results/report.md` before and after | Report row's done-when adds an independent re-derivation |
+| Read a file whole with `offset`/`limit` (`CLAUDE.md` Tools, Files) | `humanizer` in file mode must read the whole file. A bare `Read` of a 5.7 KB report came back as a `ctx_search` pointer, with no hint to page it. This is the case the removed line did not cover: the hook stops a big Read but does not say how to get the text when you need all of it | one humanizer run in the same session | One clause added to the Files line |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |
