@@ -5,9 +5,9 @@ Write `Flow: <row>` before the first tool call, then follow that flow. Several d
 
 | Task | Flow | Lead skill, invoked before the first draft or line of code | Done when (every item true, with evidence) |
 |---|---|---|---|
-| Code: feature, bug, refactor, migration | Code flow | per step 1 | gate command green · every P0/P1 fixed · step 8 reviews ran · diff has untrusted input or auth/secrets → `security-review` ran |
+| Code: feature, bug, refactor, migration | Code flow | per step 1 | gate command green · every P0/P1 fixed · step 8 reviews ran · diff has untrusted input or auth/secrets → `security-review` ran · each behavior's test seen red before its code (the failure names the missing behavior), else ✗ with the reason |
 | Plan or spec only (someone else codes) | Code flow steps 1, 3, 4; the plan file replaces plan mode | per step 1 | plan names every file, the gate command, and independent acceptance checks |
-| UI page or component in a repo | Code flow + `~/.claude/rules/frontend.md` | `ui-ux-pro-max` | screenshots per frontend gate step 4 viewed |
+| UI page or component in a repo | Code flow + `~/.claude/rules/frontend.md` | `ui-ux-pro-max` | every width and state frontend gate step 4 lists shot and viewed; one missing → ✗ |
 | Artifact, page, dashboard | Deliverable flow + frontend gate items 4, 5, 7 | `artifact-design`; chart or stat tile → `dataviz` | published, and the rendered page viewed at 375 px and desktop |
 | Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated · a `reviewer` call re-derived the headline numbers and claims from the raw data |
 | Writing, doc, message | Deliverable flow | `humanizer` on the final text | the intake note names reader and purpose (`file:line` or the message that says it); `humanizer` ran on the version delivered |
@@ -49,7 +49,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 5. **Delegate**: per `## Subagents`. A subagent runs steps 3, 6, 7 only. Plan spans ≥2 independent layers and >10 files → one `worker` per layer, plan as contract.
 6. **TDD**: each behavior's failing test is seen red before its code, fix rounds included; the `tdd` skill is required only when step 1's track names it. Happy + fail + the edge cases that apply (empty/null/boundary/concurrency/tz/unicode/overflow/permission/network/partial). Pure presentation is checked by eye per `rules/frontend.md`.
 7. **Verify**: the gate command passes; re-run the step 3 search: every site updated; UI change → screenshots per `rules/frontend.md`; rendered video → frames per `rules/video.md`. Fail → fix root cause.
-8. **Review**: after 7 is green; each range reviewed once (a review `/implement` already ran counts).
+8. **Review**: after 7 is green; each range reviewed once (a review `/implement` already ran counts; `/implement`'s closing `code-review` covers only commits no earlier review covered).
    - Diff Big → `reviewer` ← changed files + acceptance criteria (a plan or acceptance file another agent wrote counts as criteria). A spec or ticket a person wrote → `code-review` instead. Last open ticket of a spec → `code-review` on the whole spec range.
    - Untrusted input or auth/secrets → also a security review, whatever the size: `git remote` lists a remote → `security-review`; none (it needs `origin/HEAD`) → a separate `reviewer` call with a security-only prompt on the same diff, never folded into the general review.
    - Animation in the diff → also `review-animations`: UI per frontend gate step 6, rendered video per video gate step 5.

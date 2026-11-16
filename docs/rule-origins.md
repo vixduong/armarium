@@ -34,6 +34,17 @@ A separate eval on 2026-11-16 compared Code Mode off and on: 5 small synthetic t
 | Report: a `reviewer` re-derives the headline numbers (`CLAUDE.md` Route, Report row) | The eval report nearly shipped with a doubled block count, a denial count stuck at 0, a "30% saving" that was mostly cheap cache reads (about 17% by cost), a wrong cause for the `.env` leak, and a fix that needs a sandbox the config does not enable. The author caught the first two; an outside review caught the rest | `code-mode-v1/results/report.md` before and after | Report row's done-when adds an independent re-derivation |
 | Read a file whole with `offset`/`limit` (`CLAUDE.md` Tools, Files) | `humanizer` in file mode must read the whole file. A bare `Read` of a 5.7 KB report came back as a `ctx_search` pointer, with no hint to page it. This is the case the removed line did not cover: the hook stops a big Read but does not say how to get the text when you need all of it | one humanizer run in the same session | One clause added to the Files line |
 
+## Changed after watching one real session
+
+One session on 2026-11-16 built a full slice (plan, backend, frontend, reviews) in a private Django + React repo: sonnet main, 10 subagents, about $12.40 at API prices. The facts come from its transcript, read with the `claude-md-audit` skill's script, and a `reviewer` re-derived the numbers.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Code Done-when: test seen red first (`CLAUDE.md` Route) | Step 6 asks for red before code, but no Done-when item named it, so the Exit table never showed a miss. In the session, one app's tests first ran after its code was written; one guard made a test hang instead of fail, another had no red at all | backend worker transcript; its own red list | New item: each behavior's test seen red before its code, else ✗ with the reason |
+| UI Done-when: every width and state (`CLAUDE.md` Route) | The Exit marked "screenshots viewed ✓" with no loading-state shot, which frontend gate step 4 asks for | screenshot scripts in the main transcript | The item now names every width and state in step 4; one missing is ✗ |
+| `/implement`'s `code-review` covers only unreviewed commits (`CLAUDE.md` step 8) | The skill ends with `code-review` on the whole range, so the backend got an Opus `reviewer` pass and then two `code-review` agents plus a security pass on the same commits | review prompts and their ranges | Step 8 limits the closing `code-review` to commits no earlier review covered |
+| `reviewer` knows the `\| head` hook (`agents/reviewer.md`) | A `code-review` agent was blocked twice by `bash-ban-raw-tools` while paging a diff | that agent's transcript | One Scope line: size with `git diff --stat`, then read per file |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |
