@@ -27,6 +27,7 @@ claude/                      mirrors ~/.claude
 │                            researcher, evidence-auditor
 ├── hooks/                   see below
 ├── rules/                   frontend.md, video.md (stack gates)
+├── skills/claude-md-audit/  audits how this config steered a session
 └── bin/                     sync-runner-tools.mjs, sync-copilot.mjs
 docs/
 └── rule-origins.md          the incident and evidence behind each rule
@@ -41,6 +42,15 @@ Hooks (each runs only once its entry from `settings.example.json` is in your `se
 - `cbm-session-reminder` and `cbm-subagent-reminder` add `codebase-memory-mcp` context when a session or subagent starts. They do nothing if the binary is missing.
 - `codemode-ponytail-band` runs at session start when `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`. Code Mode falls back to ordinary tools while a plugin's JS mod checks tool calls, and ponytail ships one (`hooks/claude-band.json`). Removing that entry from the cached `plugin.json` lets Code Mode start; a ponytail update puts it back, and this hook says so. Self-test: `python3 -I hooks/test_codemode_ponytail_band.py`.
 - `memory-repo-symlink` runs at session start inside a git repo (outside one it does nothing). It moves `~/.claude/projects/<slug>/memory` into `<repo>/.claude/memory` and symlinks it back, so read it before you enable it. Add `**/.claude/memory/` to your global gitignore first, or the notes get committed with the repo. `CLAUDE.md` (Context) keeps each note to one decision with a `status`, so an old choice is marked `replaced` instead of sitting beside the new one.
+
+`skills/claude-md-audit` is a user-invoked skill (`/claude-md-audit <session-id>`). It reads a session's transcript and checks it against the config the session ran under. The checks cover:
+
+- whether each ✓ in the Exit table has evidence behind it
+- whether each test went red before its code was written
+- whether any commit range was reviewed twice
+- what each model escalation cost in USD
+
+Each finding is filed by layer: CLAUDE.md, rule, skill, agent, hook, plugin or repo. `scripts/session_audit.py` prints the cost per agent and every hook block and tool error. `scripts/wait_quiet.py` waits until a running session and all its subagents go quiet. The rows in `docs/rule-origins.md` under "Changed after watching one real session" came from its first run.
 
 `bin/sync-runner-tools.mjs` keeps the `tools:` list in agent frontmatter in step with your live MCP servers. The agents that list `mcp__` tools need it, and it is optional for the others.
 
@@ -73,6 +83,7 @@ Skills named in `CLAUDE.md`:
 | `remotion-best-practices` | [remotion-dev/skills](https://github.com/remotion-dev/skills) |
 | `security-review`, `update-config` | built into Claude Code |
 | `artifact-design`, `dataviz` | built into the Claude desktop app |
+| `retro` | source not recorded. `claude-md-audit` reads its category list (step 3), so you need your own copy or must edit that step. |
 | `review-animations` | a local skill with no public source, so it is not here. The animation review steps in `CLAUDE.md` and `rules/` call it, and you need your own version for them to work. |
 
 ## Install
@@ -92,6 +103,7 @@ Settings are opt-in. `settings.example.json` sets `defaultMode` to `auto` and tu
 ## Read before you copy
 - `CODING_STANDARDS.md` came from a larger project. It mentions `enforcement.md`, rule IDs such as R07 and AC-05, and a `--wb-*` token set, none of which are in this repo. Treat those as examples to rewrite.
 - `CLAUDE.md` points at `~/.claude/commands/`, `~/.claude/skills/` and `~/.claude/projects/`. Those are folders on my machine, not files in this repo.
+- `claude-md-audit` writes its reports to `/Users/Shared/claude-evals/` and adds rows to `~/projects/armarium/docs/rule-origins.md`. Change both paths in its step 7. Its prices in `session_audit.py` date from November 2026.
 - I run macOS and zsh, and I have not tested any of this on Linux or Windows.
 
 ## Feedback
