@@ -39,7 +39,7 @@ Hooks (each runs only once its entry from `settings.example.json` is in your `se
 - `bash-ban-shell-writes` blocks file writes from Bash: a heredoc into a file, `echo`/`printf`/`cat > file`, `sed -i`, `perl -i`, `tee`, and a python script fed on stdin. It lets through a heredoc into a command (`git commit -F -`), log redirects (`make check > log 2>&1`) and `/dev/null`. It shares the unlock file with `bash-ban-raw-tools`. Self-test: `python3 -I hooks/test_bash_ban_shell_writes.py`.
 - `run-cli-hook` finds a CLI such as `rtk` when the hook environment has no PATH, and exits 0 if it is not installed.
 - `cbm-session-reminder` and `cbm-subagent-reminder` add `codebase-memory-mcp` context when a session or subagent starts. They do nothing if the binary is missing.
-- `memory-repo-symlink` runs at session start inside a git repo. It moves `~/.claude/projects/<slug>/memory` into `<repo>/.claude/memory` and symlinks it back, so read it before you enable it.
+- `memory-repo-symlink` runs at session start inside a git repo (outside one it does nothing). It moves `~/.claude/projects/<slug>/memory` into `<repo>/.claude/memory` and symlinks it back, so read it before you enable it. Add `**/.claude/memory/` to your global gitignore first, or the notes get committed with the repo. `CLAUDE.md` (Context) keeps each note to one decision with a `status`, so an old choice is marked `replaced` instead of sitting beside the new one.
 
 `bin/sync-runner-tools.mjs` keeps the `tools:` list in agent frontmatter in step with your live MCP servers. The agents that list `mcp__` tools need it, and it is optional for the others.
 
@@ -57,6 +57,8 @@ The files above call out to other projects. None of them are copied here.
 | `humanizer` plugin | `settings.example.json`, writing flow | [blader/humanizer](https://github.com/blader/humanizer) |
 | `context-mode` plugin | `settings.example.json`, tool rules | [mksglu/context-mode](https://github.com/mksglu/context-mode) |
 | `context7` plugin | `settings.example.json`, docs lookups | `claude-plugins-official` marketplace |
+
+`codebase-memory-mcp` re-indexes git repos when they change. A folder with no git stays at its first index unless you run `index_repository` again or set `config set watch_non_git true`. Each linked git worktree becomes its own permanent index; `config set ignore_worktrees true` skips them.
 
 `settings.example.json` lists the marketplaces and enables the plugins. If one is missing after you merge it, add it with `/plugin marketplace add <owner/repo>` and then `/plugin install`.
 
