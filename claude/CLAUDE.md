@@ -13,7 +13,7 @@ Write `Flow: <row>` before the first tool call (a question answered in chat need
 | Writing, doc, message | Deliverable flow | `humanizer` on the final text | the intake note names reader and purpose (`file:line` or the message that says it); `humanizer` ran on the version delivered |
 | Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated · `git diff` removes only lines you meant to remove |
 | Research | Deliverable flow | `research`, or `researcher` agent | each decision-relevant claim cites a source you opened; unverified claims listed |
-| Question answered in chat, no file change | answer directly | a claim about a tool, model or price → its source first: `claude-api`, `claude-code-guide` agent, context7 | each such claim comes from a source opened this session, or the answer marks it unchecked |
+| Question answered in chat, no file change | answer directly | a fact a source holds (the repo's code, a library or version, a price, Claude itself) → that source first: read the code; docs per `## Tools`; `claude-api` or `claude-code-guide` agent; else WebSearch. General knowledge → answer | each such claim comes from a source opened this session, or the answer marks it unchecked |
 | Video | rendered by code → Code flow + `~/.claude/rules/video.md`; else Deliverable flow | `ui-ux-pro-max`; Remotion → `remotion-best-practices`; code review → `review-animations` | output probed · no blank frame · one frame per transition viewed · reading time fits every scene |
 | Claude Code settings, hooks, permissions | `update-config` | `update-config` | settings file parses (`jq empty`) |
 

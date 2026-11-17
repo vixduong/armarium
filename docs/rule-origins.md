@@ -96,7 +96,7 @@ An audit of three chat questions asked before `/claude-md-audit` (session 6d6d18
 
 | Rule (where) | What happened | Evidence | Change |
 |---|---|---|---|
-| A question answered in chat has its own row (`CLAUDE.md` Route) | No row fitted a question, so replies had no Flow line and nothing asked for a source. Turn 3 said the prompt cache lives 5 minutes and cache reads cost 1/10 of input; the session wrote 1h cache and Sonnet 5.5 reads cost 1/20. Turn 1 put the wrong cause first | transcript lines 53, 76, 83 (`ephemeral_1h`), 101 (cache hit after 16.7 min idle), 84 (the claims); `claude-api` price table | The row drops Flow and Exit for chat answers and sends tool, model and price claims to `claude-api`, `claude-code-guide` or context7 first |
+| A question answered in chat has its own row (`CLAUDE.md` Route) | No row fitted a question, so replies had no Flow line and nothing asked for a source. Turn 3 said the prompt cache lives 5 minutes and cache reads cost 1/10 of input; the session wrote 1h cache and Sonnet 5.5 reads cost 1/20. Turn 1 put the wrong cause first | transcript lines 53, 76, 83 (`ephemeral_1h`), 101 (cache hit after 16.7 min idle), 84 (the claims); `claude-api` price table | The row drops Flow and Exit for chat answers and sends any fact a source holds (repo code, library, version, price, Claude) to that source first; general knowledge is answered directly |
 | A `/skill` command counts as the call (`hooks/flow-skill-check`, `CLAUDE.md` Exit) | A skill started with `/claude-md-audit` has no `Skill` tool call, so the Stop hook blocked a Flow line that named it | the audit session's Stop block | The hook also reads `<command-name>/x</command-name>` from plain-string user records; tool results do not count |
 
 ## Kept, with evidence
