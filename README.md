@@ -37,6 +37,7 @@ windows/                     PowerShell hooks, status line, settings and install
 Hooks (each runs only once its entry from `settings.example.json` is in your `settings.json`):
 
 - `agent-no-downgrade` blocks an `Agent` call whose `model` is below that agent's frontmatter model, except the drops listed in `agent-tuning.md`. Self-test: `python3 -I hooks/test_agent_no_downgrade.py`.
+- `flow-skill-check` (Stop) blocks the end of a turn once when a `Flow:` line names a skill that has no `Skill` call in the session and the last reply does not list it as ✗. Self-test: `python3 -I hooks/test_flow_skill_check.py`.
 - `bash-ban-raw-tools` blocks raw `cat`, `head`, `tail`, `find`, `grep`, `rg` and `wc` in Bash and points to the dedicated tools. A temporary unlock file lasts 10 minutes.
 - `bash-ban-shell-writes` blocks file writes from Bash: a heredoc into a file, `echo`/`printf`/`cat > file`, `sed -i`, `perl -i`, `tee`, and a python script fed on stdin. It lets through a heredoc into a command (`git commit -F -`), log redirects (`make check > log 2>&1`) and `/dev/null`. It shares the unlock file with `bash-ban-raw-tools`. Self-test: `python3 -I hooks/test_bash_ban_shell_writes.py`.
 - `run-cli-hook` finds a CLI such as `rtk` when the hook environment has no PATH, and exits 0 if it is not installed.
@@ -62,7 +63,7 @@ The files above call out to other projects. None of them are copied here.
 | What | Used by | Where to get it |
 |---|---|---|
 | `jq` | hooks | `brew install jq` |
-| `python3` | `bash-ban-shell-writes`, `agent-no-downgrade` | preinstalled on macOS; your package manager elsewhere |
+| `python3` | `bash-ban-shell-writes`, `agent-no-downgrade`, `flow-skill-check` | preinstalled on macOS; your package manager elsewhere |
 | `rtk` | `settings.example.json` hook, `RTK.md` | `brew install rtk` ([rtk-ai.app](https://www.rtk-ai.app/)) |
 | `codebase-memory-mcp` | cbm hooks, the optional code graph in `CLAUDE.md` | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp), install script in its README |
 | `ponytail` plugin | `settings.example.json` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |

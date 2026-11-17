@@ -11,7 +11,7 @@
 | `hooks/memory-repo-symlink.ps1` | `hooks/memory-repo-symlink` (a junction, so no admin rights are needed) |
 | `hooks/codemode-ponytail-band.ps1` | `hooks/codemode-ponytail-band` |
 
-`agent-no-downgrade` and `bash-ban-shell-writes` are Python and run as they are, called with `python`.
+`agent-no-downgrade`, `bash-ban-shell-writes` and `flow-skill-check` are Python and run as they are, called with `python`.
 
 ## Install
 

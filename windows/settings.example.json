@@ -69,6 +69,17 @@
         ]
       }
     ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/Users/YOU/.claude/hooks/flow-skill-check",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "SubagentStart": [
       {
         "hooks": [

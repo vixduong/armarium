@@ -56,6 +56,16 @@ One `/implement` session on 2026-11-17 in a private Spring/Oracle workspace: son
 | Deviation from the contract is recorded, not edited in (`CLAUDE.md` step 1) | The agent changed an error code in the spec it was implementing, to match its code, without asking | transcript: `Edit` on `specs/sibft-sim.md` | One sentence: record the deviation in code and the final reply; edit the contract only after the user agrees |
 | REPL file helpers and the context-mode cap (`CLAUDE.md` Tools, Files) | `file().text()` and `edit()` on files over 2 KB were refused or silently matched nothing; seen in the audited session and the audit session itself | transcripts of both sessions | One sentence: read with `file().slice()` or `sed -n`, edit with `tools.Edit` |
 
+## Changed after the 51f24d34 session audit
+
+A second `/implement` session on 2026-11-17 (same workspace, sonnet main, $5.40) ran under the rules from the section above. A `reviewer` re-derived the numbers. Report: `claude-evals/session-51f24d34/report.md` (local).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Reviewer model follows step 8 inside `code-review` (`skills/code-review` step 4, not in this repo) | A `DROP TABLE` migration was reviewed by `/implement`'s `code-review`, whose two reviewers ran sonnet with no `model`; step 8 asks for opus on a migration, and the Exit still said "Review ✓" | transcript: the two `Agent` calls, the Exit table | One sentence in the skill: each reviewer takes the `model` step 8 gives the diff |
+| Lead skills named in `Flow:` must be called (`hooks/flow-skill-check`, Stop) | The Flow line named `lean-build` + `tdd`; neither was called, and the Exit had no lead-skill row | transcript: `Skill` calls (only `code-review`) | A Stop hook blocks once until the skill is called or listed as ✗ |
+| Contract edits need the user's agreement even when the contract is wrong (`CLAUDE.md` step 1) | Under the new rule the agent recorded the deviation but still edited the gateway spec, judging the spec itself wrong | transcript: two `Edit` calls on `specs/sibft-gateway-core.md` | Sentence extended: "also when the contract itself is wrong" |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |
