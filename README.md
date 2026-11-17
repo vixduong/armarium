@@ -31,6 +31,7 @@ claude/                      mirrors ~/.claude
 └── bin/                     sync-runner-tools.mjs, sync-copilot.mjs
 docs/
 └── rule-origins.md          the incident and evidence behind each rule
+windows/                     PowerShell hooks, status line, settings and installer; see windows/README.md
 ```
 
 Hooks (each runs only once its entry from `settings.example.json` is in your `settings.json`):

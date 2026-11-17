@@ -28,7 +28,7 @@ ALLOW = [
 ]
 
 def run(tool, inp):
-    p = subprocess.run([HOOK], input=json.dumps({"tool_name": tool, "tool_input": inp}),
+    p = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_name": tool, "tool_input": inp}),
                        capture_output=True, text=True)
     return p.returncode
 

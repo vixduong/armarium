@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "ENABLE_TOOL_SEARCH": "true",
+    "BASH_MAX_OUTPUT_LENGTH": "10000",
+    "MAX_MCP_OUTPUT_TOKENS": "10000",
+    "PONYTAIL_DEFAULT_MODE": "lite",
+    "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Read(**/.env)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "haiku",
+  "availableModels": [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-fable-5-2",
+    "claude-haiku-5-5"
+  ],
+  "skillOverrides": {
+    "caveman-review": "off",
+    "codebase-design": "off",
+    "security-audit": "off",
+    "verify-and-stop": "off",
+    "ask-matt": "off",
+    "grill-with-docs": "off",
+    "improve-codebase-architecture": "off",
+    "teach": "off",
+    "to-questionnaire": "off",
+    "wait-what": "off",
+    "triage": "off",
+    "setup-matt-pocock-skills": "off",
+    "codebase-memory": "off",
+    "implement-spec": "off"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/Users/YOU/.claude/hooks/agent-no-downgrade",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/bash-ban-raw-tools.ps1",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python C:/Users/YOU/.claude/hooks/bash-ban-shell-writes",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/run-cli-hook.ps1 rtk hook claude",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/cbm-subagent-reminder.ps1",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/memory-repo-symlink.ps1",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/cbm-session-reminder.ps1",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/codemode-ponytail-band.ps1",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "worktree": {
+    "baseRef": "fresh"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -File C:/Users/YOU/.claude/statusline.ps1"
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true,
+    "context7@claude-plugins-official": true,
+    "humanizer@humanizer": true,
+    "context-mode@context-mode": true
+  },
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      },
+      "autoUpdate": false
+    },
+    "humanizer": {
+      "source": {
+        "source": "github",
+        "repo": "blader/humanizer"
+      },
+      "autoUpdate": false
+    },
+    "context-mode": {
+      "source": {
+        "source": "github",
+        "repo": "mksglu/context-mode"
+      },
+      "autoUpdate": false
+    }
+  },
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-fable-5-2": {
+      "effortLevel": "medium"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    },
+    "claude-haiku-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "high"
+    }
+  },
+  "advisorModel": "claude-opus-5-5",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
+  "editorMode": "normal",
+  "autoCompactEnabled": true,
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true
+}

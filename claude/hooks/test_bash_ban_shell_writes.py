@@ -41,7 +41,7 @@ ALLOW = [
 ]
 
 def run(cmd):
-    p = subprocess.run([HOOK], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
+    p = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
                        capture_output=True, text=True)
     return p.returncode
 
@@ -50,7 +50,7 @@ for c in BLOCK:
     if run(c) != 2: fails += 1; print("SHOULD BLOCK:", repr(c))
 for c in ALLOW:
     if run(c) != 0: fails += 1; print("SHOULD ALLOW:", repr(c))
-nb = subprocess.run([HOOK], input=json.dumps({"tool_name": "Read", "tool_input": {}}), capture_output=True, text=True).returncode
+nb = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_name": "Read", "tool_input": {}}), capture_output=True, text=True).returncode
 if nb != 0: fails += 1; print("non-Bash tool should pass")
 print("FAILS", fails, "of", len(BLOCK) + len(ALLOW) + 1)
 sys.exit(1 if fails else 0)

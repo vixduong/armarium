@@ -2,7 +2,9 @@
 Builds a fake HOME with a ponytail install record, so the real plugin cache is never read or changed."""
 import json, os, subprocess, sys, tempfile
 
-HOOK = os.path.expanduser("~/.claude/hooks/codemode-ponytail-band")
+HOOK = [os.path.expanduser("~/.claude/hooks/codemode-ponytail-band")]
+if sys.platform == "win32":
+    HOOK = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", HOOK[0] + ".ps1"]
 
 
 def run(hooks_field, code_mode, registered=True):
@@ -16,7 +18,9 @@ def run(hooks_field, code_mode, registered=True):
     with open(os.path.join(home, ".claude", "plugins", "installed_plugins.json"), "w") as f:
         json.dump(reg, f)
     env = {"HOME": home, "PATH": os.environ["PATH"], "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": code_mode}
-    p = subprocess.run([HOOK], input="{}", capture_output=True, text=True, env=env)
+    if sys.platform == "win32":  # PowerShell reads USERPROFILE, and needs SystemRoot to start
+        env.update(USERPROFILE=home, SystemRoot=os.environ["SystemRoot"])
+    p = subprocess.run(HOOK, input="{}", capture_output=True, text=True, env=env)
     return p.returncode, p.stdout.strip()
 
 
