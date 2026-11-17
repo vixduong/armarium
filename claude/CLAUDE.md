@@ -14,11 +14,11 @@ Write `Flow: <row>` before the first tool call (a question answered in chat need
 | Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated · `git diff` removes only lines you meant to remove |
 | Research | Deliverable flow | `research`, or `researcher` agent | each decision-relevant claim cites a source you opened; unverified claims listed |
 | Question answered in chat, no file change | answer directly | a fact a source holds (the repo's code, a library or version, a price, Claude itself) → that source first: read the code; docs per `## Tools`; `claude-api` or `claude-code-guide` agent; else WebSearch. General knowledge → answer | each such claim comes from a source opened this session, or the answer marks it unchecked |
-| Video | rendered by code → Code flow + `~/.claude/rules/video.md`; else Deliverable flow | `ui-ux-pro-max`; Remotion → `remotion-best-practices`; code review → `review-animations` | output probed · no blank frame · one frame per transition viewed · reading time fits every scene |
+| Video | rendered by code → Code flow + `~/.claude/rules/video.md`; else Deliverable flow | Remotion → `remotion-best-practices`, else `ui-ux-pro-max`; rendered by code → also `lean-build` + `tdd`; code review → `review-animations` | output probed · no blank frame · one frame per transition viewed · reading time fits every scene |
 | Claude Code settings, hooks, permissions | `update-config` | `update-config` | settings file parses (`jq empty`) |
 
 Every row whose output has prose a person reads (report, page, doc, message) also ends with `humanizer` on the delivered version.
-**Exit**: every final reply except a chat answer, a short bug-fix reply included, lists the row's Done-when items, each ✓ with its evidence (command, `file:line`, skill call) or ✗ with the reason. A skill's evidence is its `Skill` tool call or the user's `/skill` command in this session; a name in the `Flow:` line is not a call. A lead skill left out appears there as ✗.
+**Exit**: every final reply except a chat answer, a short bug-fix reply included, lists the row's Done-when items, each ✓ with its evidence (command, `file:line`, skill call) or ✗ with the reason. A skill's evidence is its `Skill` tool call after the `Flow:` line that names it, or the user's `/skill` command that started the task; a name in the `Flow:` line is not a call. A lead skill left out appears there as ✗.
 
 ## Principles
 DRY/KISS/YAGNI/SSOT. Ask before destructive.
@@ -64,7 +64,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 - **Text search**: in a git repo `git grep -n` (no zsh glob, passes the `| head` ban); else `Grep`/`Glob` when listed, else `grep -rn`/`find` inside `ctx_execute(shell)`.
 - **Run/read → context-mode**: `ctx_execute` prints only the answer (`file` for a big file/log); `ctx_batch` for >1 command; `ctx_search` for recall.
 - **Docs/web**: library/API docs → context7 first.
-- **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either. A file you must read whole (to rewrite or humanize it) → `Read` with `offset`/`limit`: context-mode folds a bare Read over 2 KB into a search pointer. In a REPL script the same cap hits `file().text()` and `edit()`: read with `file().slice()` or `sed -n`, edit with `tools.Edit`.
+- **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either. A file you must read whole (to rewrite or humanize it) → `Read` with `offset`/`limit`: context-mode folds a bare Read over 2 KB into a search pointer. In a REPL script the same cap hits `file().text()`, `edit()` and `$` output: read with `file().slice()` or `sed -n`, edit with `tools.Edit`, and send long `$` output to a scratchpad log (`cmd > log 2>&1`) to read with `file().slice()`; `| head` and `| tail` are blocked.
 - **Shell is zsh**: `$cmd` holding "pnpm ci" does not word-split (exit 127); call each command directly or use the repo script.
 - **RTK**: Bash runs as `rtk <cmd>`; unfiltered → `rtk proxy <cmd>`. Details: `~/.claude/RTK.md`.
 

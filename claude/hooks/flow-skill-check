@@ -1,61 +1,80 @@
 #!/usr/bin/env python3
-# Stop gate: every skill a `Flow:` line of this session names in backticks needs a `Skill` call in this session
-# (CLAUDE.md Exit: "a name in the Flow: line is not a call"), unless a reply of this session lists it as ✗.
-# Only names that exist under ~/.claude/skills are checked. Blocks once; stop_hook_active lets the retry through.
+# Stop gate: every skill a `Flow:` line names in backticks needs, after the last Flow line that names it,
+# a `Skill` call or a reply listing it as ✗ (CLAUDE.md Exit). A `/skill` command the user typed to start
+# that task counts as the call. Only names that exist under ~/.claude/skills are checked.
+# Only Flow lines after the last user message are checked. Blocks once; stop_hook_active lets the retry through.
 # Self-test: python3 -I ~/.claude/hooks/test_flow_skill_check.py
 import json, os, re, sys
 
 SKILLS = os.path.expanduser("~/.claude/skills")
 CALL_IN_CODE = re.compile(r"""skill\s*:\s*['"]([\w:.-]+)['"]""")
 SLASH = re.compile(r"\s*(?:<command-message>[^<]*</command-message>\s*)?<command-name>/([\w:.-]+)</command-name>")  # only at the start: notifications quote tags
+NAME = re.compile(r"`([\w.-]+)`")
 
 try:
     data = json.load(sys.stdin)
     if data.get("stop_hook_active"):
         sys.exit(0)
-    records, slashed = [], set()
+    events = []  # (kind, value) in transcript order: text, call, slash, prompt
     with open(data.get("transcript_path") or "", encoding="utf-8") as f:
         for line in f:
             try:
                 r = json.loads(line)
             except ValueError:
                 continue
-            if r.get("type") == "assistant" and not r.get("isSidechain"):
-                records.append((r.get("message") or {}).get("content") or [])
-            elif r.get("type") == "user" and not r.get("isSidechain"):
-                c = (r.get("message") or {}).get("content")
-                if isinstance(c, str):  # a typed /skill is a plain-string user record; tool results are lists
-                    m = SLASH.match(c)
-                    if m:
-                        slashed.add(m.group(1).split(":")[-1])
+            if r.get("isSidechain"):
+                continue
+            content = (r.get("message") or {}).get("content")
+            if r.get("type") == "assistant" and isinstance(content, list):
+                for b in content:
+                    if b.get("type") == "text":
+                        events.append(("text", b.get("text", "")))
+                    elif b.get("type") == "tool_use":
+                        inp = b.get("input") or {}
+                        if b.get("name") == "Skill":
+                            events.append(("call", str(inp.get("skill", "")).split(":")[-1]))
+                        else:
+                            events.extend(("call", n.split(":")[-1]) for n in CALL_IN_CODE.findall(str(inp.get("code", ""))))
+            elif r.get("type") == "user" and isinstance(content, str):  # prompts and typed /skills are plain strings; tool results are lists
+                if not r.get("isMeta") and (r.get("origin") or {}).get("kind", "human") == "human":  # not hook feedback, not a task notification
+                    events.append(("prompt", None))
+                m = SLASH.match(content)
+                if m:
+                    events.append(("slash", m.group(1).split(":")[-1]))
+    last = data.get("last_assistant_message")  # the final reply may not be in the transcript yet
+    if isinstance(last, str) and last:
+        events.append(("text", last))
 except Exception:
     sys.exit(0)
 
-flows, called, crossed = [], set(slashed), set()
-for content in records:
-    if not isinstance(content, list):
+# only this turn's task is checked: Flow lines after the last user message (earlier tasks were judged at their own stop)
+turn = max([i for i, (kind, _) in enumerate(events) if kind == "prompt"], default=-1)
+flows, last_flow = [], {}  # event index of every Flow line; name -> index of the last Flow line naming it
+for i, (kind, value) in enumerate(events):
+    if kind != "text":
         continue
-    texts = [b.get("text", "") for b in content if b.get("type") == "text"]
-    for t in texts:
-        for ln in t.splitlines():
-            if ln.lstrip().startswith("Flow:"):
-                flows.append(ln)
-            elif "✗" in ln:
-                crossed.update(re.findall(r"`([\w.-]+)`", ln))
-    for b in content:
-        if b.get("type") != "tool_use":
-            continue
-        inp = b.get("input") or {}
-        if b.get("name") == "Skill":
-            called.add(str(inp.get("skill", "")).split(":")[-1])
-        else:
-            called.update(n.split(":")[-1] for n in CALL_IN_CODE.findall(str(inp.get("code", ""))))
+    for ln in value.splitlines():
+        if ln.lstrip().startswith("Flow:"):
+            flows.append(i)
+            for n in NAME.findall(ln):
+                if i > turn and os.path.isfile(os.path.join(SKILLS, n, "SKILL.md")):
+                    last_flow[n] = i
 
-named = [n for fl in flows for n in re.findall(r"`([\w.-]+)`", fl) if os.path.isfile(os.path.join(SKILLS, n, "SKILL.md"))]
-missing = [n for n in dict.fromkeys(named) if n not in called and n not in crossed]
+def satisfied(n, at):
+    before = max([i for i in flows if i < at], default=-1)  # the task starts after the previous Flow line
+    for i, (kind, value) in enumerate(events):
+        if kind == "call" and value == n and i > at:
+            return True
+        if kind == "slash" and value == n and before < i < at:
+            return True
+        if kind == "text" and i >= at and any("✗" in ln and n in NAME.findall(ln) for ln in value.splitlines() if not ln.lstrip().startswith("Flow:")):
+            return True
+    return False
+
+missing = [n for n, at in last_flow.items() if not satisfied(n, at)]
 if missing:
     names = ", ".join("`%s`" % n for n in missing)
     print(json.dumps({"decision": "block", "reason":
-        "The Flow line names %s, but this session has no Skill call for it. Call it now, "
+        "The Flow line names %s, but no Skill call for it follows that line. Call it now, "
         "or list it as ✗ with the reason in the Exit (CLAUDE.md Exit). A name that is only a file you edit needs nothing." % names}))
 sys.exit(0)

@@ -99,6 +99,17 @@ An audit of three chat questions asked before `/claude-md-audit` (session 6d6d18
 | A question answered in chat has its own row (`CLAUDE.md` Route) | No row fitted a question, so replies had no Flow line and nothing asked for a source. Turn 3 said the prompt cache lives 5 minutes and cache reads cost 1/10 of input; the session wrote 1h cache and Sonnet 5.5 reads cost 1/20. Turn 1 put the wrong cause first | transcript lines 53, 76, 83 (`ephemeral_1h`), 101 (cache hit after 16.7 min idle), 84 (the claims); `claude-api` price table | The row drops Flow and Exit for chat answers and sends any fact a source holds (repo code, library, version, price, Claude) to that source first; general knowledge is answered directly |
 | A `/skill` command counts as the call (`hooks/flow-skill-check`, `CLAUDE.md` Exit) | A skill started with `/claude-md-audit` has no `Skill` tool call, so the Stop hook blocked a Flow line that named it | the audit session's Stop block | The hook also reads `<command-name>/x</command-name>` from plain-string user records; tool results do not count |
 
+## Changed after the 3d60fcff session audit
+
+A self-audit of a session with seven deliverables ($21.22). Report: `/Users/Shared/claude-evals/session-3d60fcff/report.md`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Skill evidence follows the Flow line (`CLAUDE.md` Exit, `hooks/flow-skill-check`) | The post's Exit marked `humanizer` ✓ by citing a call made an hour earlier for another deliverable; the hook accepted any call in the session | transcript lines 459 (call) and 1181 (the post's Flow line, no call after it) | A call counts only after the last Flow line naming it; a `/skill` command counts only for the task it started; only this turn's Flow lines are checked |
+| One owner for Video lead skills (`CLAUDE.md` Route, `rules/video.md`) | Three places listed different leads: `ui-ux-pro-max` ran after the first code write, `lean-build` and `tdd` never ran and no Exit showed them as ✗ | lines 1342, 1463, 2084, 2028 | The Video row owns the list; `video.md` points to it |
+| The Stop hook reads the final reply (`hooks/flow-skill-check`) | A reply with the right ✗ line was blocked in the same second it was written | lines 612 to 615 | The hook also reads `last_assistant_message` from its input |
+| Long `$` output in REPL scripts (`CLAUDE.md` Tools) | context-mode folded `$` output over 2 KB four times, and `| head` was blocked twice | the report's finding 5 | Send it to a scratchpad log and read with `file().slice()` |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |
