@@ -45,6 +45,17 @@ One session on 2026-11-16 built a full slice (plan, backend, frontend, reviews) 
 | `/implement`'s `code-review` covers only unreviewed commits (`CLAUDE.md` step 8) | The skill ends with `code-review` on the whole range, so the backend got an Opus `reviewer` pass and then two `code-review` agents plus a security pass on the same commits | review prompts and their ranges | Step 8 limits the closing `code-review` to commits no earlier review covered |
 | `reviewer` knows the `\| head` hook (`agents/reviewer.md`) | A `code-review` agent was blocked twice by `bash-ban-raw-tools` while paging a diff | that agent's transcript | One Scope line: size with `git diff --stat`, then read per file |
 
+## Changed after the 2026-11-17 session audit
+
+One `/implement` session on 2026-11-17 in a private Spring/Oracle workspace: sonnet main and one `reviewer`, $4.10 at the audit script's prices. A `reviewer` re-derived the numbers from the transcript. Report: `claude-evals/session-6a542f78/report.md` (local).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Gate must run the changed tests (`CLAUDE.md` Route, Code Done-when) | The Exit marked the gate ✓ with `skipped=124`; per the session's final reply, the skips were the e2e classes it edited, because Docker was down | transcript: final reply table; `docker ps` failure | Done-when now reads "gate command green and it ran the changed tests (skip count stated)" |
+| P0-only re-check after a P1 fix (`CLAUDE.md` Route, Code Done-when) | Step 8 asks for it; the agent skipped it and still marked "step 8 reviews ran ✓" with a footnote | transcript: final reply table | Done-when now reads "every P0/P1 fixed, then the P0-only re-check ran" |
+| Deviation from the contract is recorded, not edited in (`CLAUDE.md` step 1) | The agent changed an error code in the spec it was implementing, to match its code, without asking | transcript: `Edit` on `specs/sibft-sim.md` | One sentence: record the deviation in code and the final reply; edit the contract only after the user agrees |
+| REPL file helpers and the context-mode cap (`CLAUDE.md` Tools, Files) | `file().text()` and `edit()` on files over 2 KB were refused or silently matched nothing; seen in the audited session and the audit session itself | transcripts of both sessions | One sentence: read with `file().slice()` or `sed -n`, edit with `tools.Edit` |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |

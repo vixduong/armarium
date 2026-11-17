@@ -5,7 +5,7 @@ Write `Flow: <row>` before the first tool call, then follow that flow. Several d
 
 | Task | Flow | Lead skill, invoked before the first draft or line of code | Done when (every item true, with evidence) |
 |---|---|---|---|
-| Code: feature, bug, refactor, migration | Code flow | per step 1 | gate command green · every P0/P1 fixed · step 8 reviews ran · diff has untrusted input or auth/secrets → `security-review` ran · each behavior's test seen red before its code (the failure names the missing behavior), else ✗ with the reason |
+| Code: feature, bug, refactor, migration | Code flow | per step 1 | gate command green and it ran the changed tests (skip count stated) · every P0/P1 fixed, then the P0-only re-check ran · step 8 reviews ran · diff has untrusted input or auth/secrets → `security-review` ran · each behavior's test seen red before its code (the failure names the missing behavior), else ✗ with the reason |
 | Plan or spec only (someone else codes) | Code flow steps 1, 3, 4; the plan file replaces plan mode | per step 1 | plan names every file, the gate command, and independent acceptance checks |
 | UI page or component in a repo | Code flow + `~/.claude/rules/frontend.md` | `ui-ux-pro-max` | every width and state frontend gate step 4 lists shot and viewed; one missing → ✗ |
 | Artifact, page, dashboard | Deliverable flow + frontend gate items 4, 5, 7 | `artifact-design`; chart or stat tile → `dataviz` | published, and the rendered page viewed at 375 px and desktop |
@@ -36,7 +36,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 **Big** = >3 files, or >200 changed lines, or touches auth/permission, money, migration, public API, concurrency.
 **Untrusted input** = the diff parses data from a user, file (repo config included when its values reach HTML, CSS or a shell), or network, or renders raw HTML (`dangerouslySetInnerHTML`, `innerHTML`, `v-html`, `eval`).
 
-1. **Intake**: spec, ticket, or approved plan given → it is the contract: its acceptance criteria are the check; skip 2, 4 and track choice. The Route row's lead skill (UI → `ui-ux-pro-max`) and step 6 still run before the first line of code.
+1. **Intake**: spec, ticket, or approved plan given → it is the contract: its acceptance criteria are the check; skip 2, 4 and track choice. The Route row's lead skill (UI → `ui-ux-pro-max`) and step 6 still run before the first line of code. Code that must differ from the contract → record the deviation in code and the final reply; edit the contract only after the user agrees.
    Otherwise pick ONE track; its skill leads: feature → `lean-build` + `tdd` · bug, cause known → `surgical-patch` · bug, cause unknown or perf → `diagnosing-bugs` (`investigate-first` if intermittent), then `surgical-patch` · refactor → `safe-refactor` · schema/API/data transition → `migration` · video/animation rendered by code → `lean-build` + `tdd` + `~/.claude/rules/video.md` · file of stack X → its gate in `~/.claude/rules/`.
    User-only skills (suggest in one line): goal unclear → `/grill-me`; larger than one session → `/wayfinder`; settled → `/to-spec` → `/to-tickets` → `/implement`.
 2. **Clarify**: ambiguous → `AskUserQuestion`. Headless → write the assumption where the task says, then continue.
@@ -63,7 +63,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 - **Text search**: `Grep`/`Glob` when listed, else `grep -rn`/`find` inside `ctx_execute(shell)`.
 - **Run/read → context-mode**: `ctx_execute` prints only the answer (`file` for a big file/log); `ctx_batch` for >1 command; `ctx_search` for recall.
 - **Docs/web**: library/API docs → context7 first.
-- **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either. A file you must read whole (to rewrite or humanize it) → `Read` with `offset`/`limit`: context-mode folds a bare Read over 2 KB into a search pointer.
+- **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either. A file you must read whole (to rewrite or humanize it) → `Read` with `offset`/`limit`: context-mode folds a bare Read over 2 KB into a search pointer. In a REPL script the same cap hits `file().text()` and `edit()`: read with `file().slice()` or `sed -n`, edit with `tools.Edit`.
 - **Shell is zsh**: `$cmd` holding "pnpm ci" does not word-split (exit 127); call each command directly or use the repo script.
 - **RTK**: Bash runs as `rtk <cmd>`; unfiltered → `rtk proxy <cmd>`. Details: `~/.claude/RTK.md`.
 
