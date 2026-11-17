@@ -9,6 +9,8 @@ def asst(*blocks):
 def text(t): return {"type": "text", "text": t}
 def skill(n): return {"type": "tool_use", "name": "Skill", "input": {"skill": n}}
 def repl(code): return {"type": "tool_use", "name": "REPL", "input": {"code": code}}
+def slash(n): return {"type": "user", "message": {"role": "user", "content": "<command-message>%s</command-message>\n<command-name>/%s</command-name>" % (n, n)}}
+def tool_result(t): return {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "content": t}]}}
 FLOW = text("Flow: Code flow (feature track: `lean-build` + `tdd`; spec is the contract, `/implement`)")
 
 def run(records, active=False, path=None):
@@ -33,6 +35,8 @@ CASES = [  # (name, records, active, expect_block)
     ("stop hook already active", [asst(FLOW)], True, False),
     ("no Flow line", [asst(text("hi"))], False, False),
     ("Flow repeated later without names", [asst(FLOW), asst(text("Flow: Code flow (feature track, spec as contract)"))], False, True),
+    ("started by slash command", [slash("lean-build"), slash("tdd"), asst(FLOW), asst(text("done"))], False, False),
+    ("command tag inside a tool result", [asst(FLOW), tool_result("<command-name>/lean-build</command-name> <command-name>/tdd</command-name>")], False, True),
     ("subagent records ignored", [asst(FLOW), dict(asst(skill("lean-build"), skill("tdd")), isSidechain=True)], False, True),
 ]
 fails = 0

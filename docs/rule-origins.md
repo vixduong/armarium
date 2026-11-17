@@ -90,6 +90,15 @@ A `/retro` on the config-review session above (session 28008295, $4.45).
 | A diff goes to an agent as a range (`CLAUDE.md` Subagents) | A pasted `git diff` reached the security sub-task cut to 359 characters by an output hook | the session's script 29 stderr | Prompt line: pass `git diff <base>` for the agent to run |
 | Removed lines checked (`CLAUDE.md` Route, Agent docs row) | An edit fused two bullets; the drop from 28 to 27 lines was reported as a win under "`wc -l` no higher" | `CODING_STANDARDS.md:7` before the fix | Done-when adds "`git diff` removes only lines you meant to remove" |
 
+## Changed after the 6d6d184a session audit
+
+An audit of three chat questions asked before `/claude-md-audit` (session 6d6d184a, $0.23 for the questions). Report: `/Users/Shared/claude-evals/session-6d6d184a/report-qa.md`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| A question answered in chat has its own row (`CLAUDE.md` Route) | No row fitted a question, so replies had no Flow line and nothing asked for a source. Turn 3 said the prompt cache lives 5 minutes and cache reads cost 1/10 of input; the session wrote 1h cache and Sonnet 5.5 reads cost 1/20. Turn 1 put the wrong cause first | transcript lines 53, 76, 83 (`ephemeral_1h`), 101 (cache hit after 16.7 min idle), 84 (the claims); `claude-api` price table | The row drops Flow and Exit for chat answers and sends tool, model and price claims to `claude-api`, `claude-code-guide` or context7 first |
+| A `/skill` command counts as the call (`hooks/flow-skill-check`, `CLAUDE.md` Exit) | A skill started with `/claude-md-audit` has no `Skill` tool call, so the Stop hook blocked a Flow line that named it | the audit session's Stop block | The hook also reads `<command-name>/x</command-name>` from plain-string user records; tool results do not count |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |

@@ -7,12 +7,13 @@ import json, os, re, sys
 
 SKILLS = os.path.expanduser("~/.claude/skills")
 CALL_IN_CODE = re.compile(r"""skill\s*:\s*['"]([\w:.-]+)['"]""")
+SLASH = re.compile(r"<command-name>/([\w:.-]+)</command-name>")
 
 try:
     data = json.load(sys.stdin)
     if data.get("stop_hook_active"):
         sys.exit(0)
-    records = []
+    records, slashed = [], set()
     with open(data.get("transcript_path") or "", encoding="utf-8") as f:
         for line in f:
             try:
@@ -21,10 +22,14 @@ try:
                 continue
             if r.get("type") == "assistant" and not r.get("isSidechain"):
                 records.append((r.get("message") or {}).get("content") or [])
+            elif r.get("type") == "user" and not r.get("isSidechain"):
+                c = (r.get("message") or {}).get("content")
+                if isinstance(c, str):  # a typed /skill is a plain-string user record; tool results are lists
+                    slashed.update(n.split(":")[-1] for n in SLASH.findall(c))
 except Exception:
     sys.exit(0)
 
-flows, called, crossed = [], set(), set()
+flows, called, crossed = [], set(slashed), set()
 for content in records:
     if not isinstance(content, list):
         continue
