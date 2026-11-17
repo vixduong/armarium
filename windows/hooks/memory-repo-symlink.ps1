@@ -10,6 +10,12 @@ if (-not $git) { exit 0 }
 $repoRoot = (& git -C $cwd rev-parse --show-toplevel 2>$null)
 if (-not $repoRoot) { exit 0 }
 $repoRoot = $repoRoot.Replace('/', '\').TrimEnd('\')
+# In a linked worktree, use the main checkout so memory outlives the worktree.
+$common = (& git -C $cwd rev-parse --path-format=absolute --git-common-dir 2>$null)
+if ($common) {
+  $common = $common.Replace('/', '\').TrimEnd('\')
+  if ((Split-Path $common -Leaf) -eq '.git') { $repoRoot = Split-Path $common -Parent }
+}
 
 # shortcut: slug rule inferred from observed project dir names; if it mismatches we
 # simply do nothing (no junk dirs), so memory stays in the projects dir as before.
@@ -41,6 +47,9 @@ if ($item -and -not $item.LinkType) {
   Remove-Item -LiteralPath $projectsMemory -Force
 }
 
+# A junction that points elsewhere: drop the link only (never its target), then recreate it.
+# New-Item -Force over an existing junction removes it without recreating it.
+if ($item -and $item.LinkType) { $item.Delete() }
 # Junction, not symlink: works without admin/Developer Mode.
 New-Item -ItemType Junction -Path $projectsMemory -Target $repoMemory -Force | Out-Null
 exit 0

@@ -22,10 +22,12 @@ $trimmed = $cmd.TrimStart()
 $first = ($trimmed -split '\s+')[0]
 if ($first -eq 'rtk') { exit 0 }   # rtk wraps git/cargo/pytest/docker/etc.
 
-$readers = 'cat|head|tail|find|grep|rg|wc|Get-Content|gc|type|Select-String|sls|findstr'
+# `type` reads a file only in PowerShell; in Bash it is a shell builtin (`type -a git`).
+$type = if ($p.tool_name -eq 'PowerShell') { '|type' } else { '' }
+$readers = "cat|head|tail|find|grep|rg|wc|Get-Content|gc|Select-String|sls|findstr$type"
 
 # A truncation pipe after a file reader still floods context before the trim.
-if ($cmd -match '\|\s*(tail|head)\b' -and $first -match '^(cat|grep|rg|find|Get-Content|gc|type|Select-String|sls|findstr)$') {
+if ($cmd -match '\|\s*(tail|head)\b' -and $first -match "^(cat|grep|rg|find|Get-Content|gc|Select-String|sls|findstr$type)$") {
   [Console]::Error.WriteLine(@'
 BLOCKED: '| tail'/'| head' pipeline. Output truncation not allowed - raw output still floods context before trim.
 

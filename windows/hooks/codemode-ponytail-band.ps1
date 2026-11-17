@@ -4,10 +4,10 @@
 $ErrorActionPreference = 'SilentlyContinue'
 if ($env:CLAUDE_CODE_EXPERIMENTAL_CODE_MODE -ne '1') { exit 0 }
 try {
-  $reg = Get-Content -Raw (Join-Path $env:USERPROFILE '.claude\plugins\installed_plugins.json') | ConvertFrom-Json
+  $reg = Get-Content -Raw -Encoding UTF8 (Join-Path $env:USERPROFILE '.claude\plugins\installed_plugins.json') | ConvertFrom-Json
   $dir = $reg.plugins.'ponytail@ponytail'[0].installPath
   if (-not $dir) { exit 0 }
-  $plugin = Get-Content -Raw (Join-Path $dir '.claude-plugin\plugin.json') | ConvertFrom-Json
+  $plugin = Get-Content -Raw -Encoding UTF8 (Join-Path $dir '.claude-plugin\plugin.json') | ConvertFrom-Json
 } catch { exit 0 }
 if ((ConvertTo-Json $plugin.hooks -Depth 10 -Compress) -notmatch 'claude-band') { exit 0 }
 $msg = "Code Mode is on, but ponytail $(Split-Path $dir -Leaf) registers its band mod again, so Code Mode falls back to ordinary tools. Remove `"./hooks/claude-band.json`" from $dir/.claude-plugin/plugin.json."

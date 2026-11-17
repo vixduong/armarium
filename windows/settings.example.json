@@ -107,7 +107,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "powershell -NoProfile -File C:/Users/YOU/.claude/statusline.ps1"
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/statusline.ps1"
   },
   "enabledPlugins": {
     "ponytail@ponytail": true,
