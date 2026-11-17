@@ -42,7 +42,7 @@ try:
                 if m:
                     events.append(("slash", m.group(1).split(":")[-1]))
     last = data.get("last_assistant_message")  # the final reply may not be in the transcript yet
-    if isinstance(last, str) and last:
+    if isinstance(last, str) and last and ("text", last) not in events:  # count it once if the transcript already has it
         events.append(("text", last))
 except Exception:
     sys.exit(0)

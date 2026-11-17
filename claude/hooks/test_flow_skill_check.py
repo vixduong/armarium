@@ -56,6 +56,9 @@ for name, recs, active, want in CASES:
     if blocked(r) != want: fails += 1; print("FAIL:", name, r)
     if name == "none called" and blocked(r) and "`lean-build`" not in r[1].get("reason", ""): fails += 1; print("reason should name lean-build:", r)
     if name == "one missing" and blocked(r) and ("`tdd`" not in r[1]["reason"] or "`lean-build`" in r[1]["reason"]): fails += 1; print("reason should name only tdd:", r)
+# the final reply is already in the transcript too: it must not count twice
+r = run([slash("lean-build"), slash("tdd"), asst(FLOW)], last=FLOW["text"])
+if blocked(r): fails += 1; print("FAIL: a reply already in the transcript counted twice", r)
 # the final reply arrives on stdin before it reaches the transcript
 r = run([asst(FLOW)], last="- ✗ `lean-build` and `tdd` not called: no new code")
 if blocked(r): fails += 1; print("FAIL: x in last_assistant_message should clear", r)
@@ -63,5 +66,5 @@ r = run([asst(text("hi"))], last="Flow: Code flow (`lean-build` + `tdd`)")
 if not blocked(r): fails += 1; print("FAIL: Flow line in last_assistant_message should count", r)
 miss = run([], path="C:/no/such/file.jsonl")
 if miss[0] != 0 or blocked(miss): fails += 1; print("missing transcript should pass")
-print("FAILS", fails, "of", len(CASES) + 3)
+print("FAILS", fails, "of", len(CASES) + 4)
 sys.exit(1 if fails else 0)
