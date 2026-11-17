@@ -1,7 +1,7 @@
 # Rules
 
 ## Route: the first line of every task
-Write `Flow: <row>` before the first tool call, then follow that flow; backticks in that line go only around skills you will call. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI and Artifact). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix always takes the full flow) → Clarify, Ripple, Verify of the Code flow only.
+Write `Flow: <row>` before the first tool call (a question answered in chat needs none), then follow that flow; backticks in that line go only around skills you will call. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI and Artifact). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix always takes the full flow) → Clarify, Ripple, Verify of the Code flow only.
 
 | Task | Flow | Lead skill, invoked before the first draft or line of code | Done when (every item true, with evidence) |
 |---|---|---|---|
@@ -13,12 +13,12 @@ Write `Flow: <row>` before the first tool call, then follow that flow; backticks
 | Writing, doc, message | Deliverable flow | `humanizer` on the final text | the intake note names reader and purpose (`file:line` or the message that says it); `humanizer` ran on the version delivered |
 | Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated · `git diff` removes only lines you meant to remove |
 | Research | Deliverable flow | `research`, or `researcher` agent | each decision-relevant claim cites a source you opened; unverified claims listed |
-| Question answered in chat, no file change | answer directly; no `Flow:` line, no Exit list | a claim about a tool, model or price → its source first: `claude-api`, `claude-code-guide` agent, context7 | each such claim comes from a source opened this session, or the answer marks it unchecked |
+| Question answered in chat, no file change | answer directly | a claim about a tool, model or price → its source first: `claude-api`, `claude-code-guide` agent, context7 | each such claim comes from a source opened this session, or the answer marks it unchecked |
 | Video | rendered by code → Code flow + `~/.claude/rules/video.md`; else Deliverable flow | `ui-ux-pro-max`; Remotion → `remotion-best-practices`; code review → `review-animations` | output probed · no blank frame · one frame per transition viewed · reading time fits every scene |
 | Claude Code settings, hooks, permissions | `update-config` | `update-config` | settings file parses (`jq empty`) |
 
 Every row whose output has prose a person reads (report, page, doc, message) also ends with `humanizer` on the delivered version.
-**Exit**: every final reply, a short bug-fix reply included, lists the row's Done-when items, each ✓ with its evidence (command, `file:line`, skill call) or ✗ with the reason. A skill's evidence is its `Skill` tool call or the user's `/skill` command in this session; a name in the `Flow:` line is not a call. A lead skill left out appears there as ✗.
+**Exit**: every final reply except a chat answer, a short bug-fix reply included, lists the row's Done-when items, each ✓ with its evidence (command, `file:line`, skill call) or ✗ with the reason. A skill's evidence is its `Skill` tool call or the user's `/skill` command in this session; a name in the `Flow:` line is not a call. A lead skill left out appears there as ✗.
 
 ## Principles
 DRY/KISS/YAGNI/SSOT. Ask before destructive.

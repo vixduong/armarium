@@ -7,7 +7,7 @@ import json, os, re, sys
 
 SKILLS = os.path.expanduser("~/.claude/skills")
 CALL_IN_CODE = re.compile(r"""skill\s*:\s*['"]([\w:.-]+)['"]""")
-SLASH = re.compile(r"<command-name>/([\w:.-]+)</command-name>")
+SLASH = re.compile(r"\s*(?:<command-message>[^<]*</command-message>\s*)?<command-name>/([\w:.-]+)</command-name>")  # only at the start: notifications quote tags
 
 try:
     data = json.load(sys.stdin)
@@ -25,7 +25,9 @@ try:
             elif r.get("type") == "user" and not r.get("isSidechain"):
                 c = (r.get("message") or {}).get("content")
                 if isinstance(c, str):  # a typed /skill is a plain-string user record; tool results are lists
-                    slashed.update(n.split(":")[-1] for n in SLASH.findall(c))
+                    m = SLASH.match(c)
+                    if m:
+                        slashed.add(m.group(1).split(":")[-1])
 except Exception:
     sys.exit(0)
 

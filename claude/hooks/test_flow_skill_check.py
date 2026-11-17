@@ -36,6 +36,7 @@ CASES = [  # (name, records, active, expect_block)
     ("no Flow line", [asst(text("hi"))], False, False),
     ("Flow repeated later without names", [asst(FLOW), asst(text("Flow: Code flow (feature track, spec as contract)"))], False, True),
     ("started by slash command", [slash("lean-build"), slash("tdd"), asst(FLOW), asst(text("done"))], False, False),
+    ("command tag quoted in a task notification", [asst(FLOW), {"type": "user", "message": {"role": "user", "content": "<task-notification><result>quotes <command-name>/lean-build</command-name> and <command-name>/tdd</command-name></result></task-notification>"}}], False, True),
     ("command tag inside a tool result", [asst(FLOW), tool_result("<command-name>/lean-build</command-name> <command-name>/tdd</command-name>")], False, True),
     ("subagent records ignored", [asst(FLOW), dict(asst(skill("lean-build"), skill("tdd")), isSidechain=True)], False, True),
 ]
