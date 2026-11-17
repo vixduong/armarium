@@ -96,7 +96,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python C:/Users/YOU/.claude/hooks/armarium-links",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/memory-repo-symlink.ps1",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python C:/Users/YOU/.claude/hooks/skill-model-invocable review-animations",
             "timeout": 10
           },
           {

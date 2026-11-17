@@ -2,7 +2,7 @@
 Uses the real skills in ~/.claude/skills (tdd, lean-build)."""
 import json, os, subprocess, sys, tempfile
 
-HOOK = os.path.expanduser("~/.claude/hooks/flow-skill-check")
+HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "flow-skill-check")  # the hook beside this test, not the installed one
 
 def asst(*blocks):
     return {"type": "assistant", "message": {"role": "assistant", "content": list(blocks)}}
@@ -29,6 +29,7 @@ CASES = [  # (name, records, active, expect_block)
     ("called in REPL code", [asst(FLOW, repl("await tools.Skill({skill: 'lean-build'}); await tools.Skill({skill:\"tdd\"})")), asst(text("done"))], False, False),
     ("called earlier in session", [asst(skill("tdd"), skill("lean-build")), asst(FLOW), asst(text("done"))], False, False),
     ("listed as x in the last reply", [asst(FLOW), asst(text("- ✗ `lean-build` and `tdd` not called: no new code"))], False, False),
+    ("listed as x in an earlier reply", [asst(FLOW), asst(text("- ✗ `lean-build` and `tdd` not called: no new code")), asst(text("next task done"))], False, False),
     ("stop hook already active", [asst(FLOW)], True, False),
     ("no Flow line", [asst(text("hi"))], False, False),
     ("Flow repeated later without names", [asst(FLOW), asst(text("Flow: Code flow (feature track, spec as contract)"))], False, True),

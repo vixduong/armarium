@@ -1,7 +1,7 @@
 # Rules
 
 ## Route: the first line of every task
-Write `Flow: <row>` before the first tool call, then follow that flow. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI and Artifact). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix always takes the full flow) → Clarify, Ripple, Verify of the Code flow only.
+Write `Flow: <row>` before the first tool call, then follow that flow; backticks in that line go only around skills you will call. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI and Artifact). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix always takes the full flow) → Clarify, Ripple, Verify of the Code flow only.
 
 | Task | Flow | Lead skill, invoked before the first draft or line of code | Done when (every item true, with evidence) |
 |---|---|---|---|
@@ -11,7 +11,7 @@ Write `Flow: <row>` before the first tool call, then follow that flow. Several d
 | Artifact, page, dashboard | Deliverable flow + frontend gate items 4, 5, 7 | `artifact-design`; chart or stat tile → `dataviz` | published, and the rendered page viewed at 375 px and desktop |
 | Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated · a `reviewer` call re-derived the headline numbers and claims from the raw data |
 | Writing, doc, message | Deliverable flow | `humanizer` on the final text | the intake note names reader and purpose (`file:line` or the message that says it); `humanizer` ran on the version delivered |
-| Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated |
+| Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated · `git diff` removes only lines you meant to remove |
 | Research | Deliverable flow | `research`, or `researcher` agent | each decision-relevant claim cites a source you opened; unverified claims listed |
 | Video | rendered by code → Code flow + `~/.claude/rules/video.md`; else Deliverable flow | `ui-ux-pro-max`; Remotion → `remotion-best-practices`; code review → `review-animations` | output probed · no blank frame · one frame per transition viewed · reading time fits every scene |
 | Claude Code settings, hooks, permissions | `update-config` | `update-config` | settings file parses (`jq empty`) |
@@ -53,14 +53,14 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
    - Diff Big → `reviewer` ← changed files + acceptance criteria (a plan or acceptance file another agent wrote counts as criteria). A spec or ticket a person wrote → `code-review` instead. Last open ticket of a spec → `code-review` on the whole spec range.
    - Untrusted input or auth/secrets → also a security review, whatever the size: `git remote` lists a remote → `security-review`; none (it needs `origin/HEAD`) → a separate `reviewer` call with a security-only prompt on the same diff, never folded into the general review.
    - Animation in the diff → also `review-animations`: UI per frontend gate step 6, rendered video per video gate step 5.
-   - Hard to undo (auth/permission, secrets, money, migration) → `reviewer` with `model: "opus"`, whatever the size. Other untrusted input or public API → its default sonnet/high; a review that still missed a bug → one tier up per `~/.claude/agent-tuning.md`.
+   - Model: every `reviewer` call runs at least on the tier that wrote the code, capped at opus (main session on opus → `model: "opus"`), and at least opus when hard to undo (auth/permission, secrets, money, migration), whatever the size; otherwise its default sonnet/high. A review that still missed a bug → one tier up per `~/.claude/agent-tuning.md`.
    - Fix every P0/P1 → back to 7 → one P0-only re-check. Still P0 after 2 rounds → stop and report. P2 → list in the final reply.
 
 **New gate** for a stack or medium: `~/.claude/rules/<name>.md`, `paths:` frontmatter, first line `Invoke <skill> FIRST`, then a numbered self-check; add its row to Route.
 
 ## Tools
-- **Code graph (CBM), optional**: its tools are deferred, so load first (`ToolSearch` `select:mcp__codebase-memory-mcp__<tool>`); `search_graph` → `trace_path` → `get_code_snippet`. `Transport closed` / `MCP error -32000` → same tool via `~/.local/bin/codebase-memory-mcp cli <tool>` (flags = schema args in kebab-case) in `ctx_execute(shell)`, or fall back to text search.
-- **Text search**: `Grep`/`Glob` when listed, else `grep -rn`/`find` inside `ctx_execute(shell)`.
+- **Code graph (CBM), optional**: its tools are deferred, so load first (`ToolSearch` `select:mcp__codebase-memory-mcp__<tool>`). `Transport closed` / `MCP error -32000` → same tool via `~/.local/bin/codebase-memory-mcp cli <tool>` (flags = schema args in kebab-case) in `ctx_execute(shell)`, or fall back to text search.
+- **Text search**: in a git repo `git grep -n` (no zsh glob, passes the `| head` ban); else `Grep`/`Glob` when listed, else `grep -rn`/`find` inside `ctx_execute(shell)`.
 - **Run/read → context-mode**: `ctx_execute` prints only the answer (`file` for a big file/log); `ctx_batch` for >1 command; `ctx_search` for recall.
 - **Docs/web**: library/API docs → context7 first.
 - **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either. A file you must read whole (to rewrite or humanize it) → `Read` with `offset`/`limit`: context-mode folds a bare Read over 2 KB into a search pointer. In a REPL script the same cap hits `file().text()` and `edit()`: read with `file().slice()` or `sed -n`, edit with `tools.Edit`.
@@ -72,7 +72,7 @@ Main = coordinator: integrates + verifies. Agents pin `model`+`effort`; changing
 - **Delegate**: online research, refactor >2 files, summarize >1 file, audit, unknown-repo recon, big log triage. Inline: one chain of dependent steps, work that fits one context.
 - **Parallel**: max 3; serial if dependent or same file; risky parallel writes → `isolation: worktree`.
 - **Wait**: next step needs the result → run the agent in the foreground. `ScheduleWakeup` belongs to `/loop` only.
-- **Prompt**: self-contained, <500 tok: goal + named files/symbols + constraint + acceptance check + return format.
+- **Prompt**: self-contained, <500 tok: goal + named files/symbols + constraint + acceptance check + return format. A diff goes in as a range the agent runs (`git diff <base>`), never pasted: output hooks shorten pasted text.
 - **Pick** by description: `explorer` over `Explore`; `Plan` = steps, `oracle` = decisions (~once per run, own Fable limit); `evidence-auditor` before a decision rests on `researcher` claims.
 - **Report = claim**: check the diff, re-run cited evidence, confirm the acceptance check passed.
 

@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+# SessionStart: remove `disable-model-invocation: true` from the frontmatter of each skill named in argv,
+# so the model can call it again after an update (`npx skills update`) restores the upstream file.
+# Claude Code reloads its skill list when SKILL.md changes (seen mid-session on 2026-11-17); if not, a new session picks it up.
+# Fail-open: a missing or unreadable skill is skipped.
+# Self-test: python3 -I ~/.claude/hooks/test_skill_model_invocable.py
+import json, os, re, sys
+
+SKILLS = os.path.expanduser("~/.claude/skills")
+FRONT = re.compile(r"---\r?\n.*?\r?\n---\r?\n", re.S)
+FLAG = re.compile(r"^disable-model-invocation:[ \t]*true[ \t]*\r?\n", re.M)
+
+unlocked = []
+for name in sys.argv[1:]:
+    path = os.path.join(SKILLS, name, "SKILL.md")
+    try:
+        with open(path, encoding="utf-8", newline="") as f:
+            text = f.read()
+        m = FRONT.match(text)
+        head = FLAG.sub("", m.group(0)) if m else ""
+        if not m or head == m.group(0):
+            continue
+        with open(path, "w", encoding="utf-8", newline="") as f:  # writes through a symlinked skill dir
+            f.write(head + text[m.end():])
+        unlocked.append(name)
+    except (OSError, UnicodeDecodeError):
+        continue
+
+if unlocked:
+    print(json.dumps({"systemMessage": "Removed disable-model-invocation from %s so the model can call it."
+                      % ", ".join(unlocked)}))

@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+# SessionStart: when ~/.claude/CLAUDE.md is a symlink into an armarium clone, link every file the repo tracks
+# under claude/ that ~/.claude lacks, and report files that sit in ~/.claude as a copy or a link elsewhere.
+# A copy install (CLAUDE.md is a plain file) is left alone. Copies are reported, never replaced.
+# Self-test: python3 -I ~/.claude/hooks/test_armarium_links.py
+import json, os, subprocess, sys
+
+DOT = os.path.expanduser("~/.claude")
+anchor = os.path.join(DOT, "CLAUDE.md")
+if not os.path.islink(anchor):
+    sys.exit(0)
+src_dir = os.path.dirname(os.path.realpath(anchor))  # <repo>/claude
+if not os.path.isfile(os.path.join(src_dir, "hooks", "armarium-links")):  # CLAUDE.md links into some other repo
+    sys.exit(0)
+try:
+    files = subprocess.run(["git", "-C", src_dir, "ls-files", "-z", "."], capture_output=True, text=True,
+                           timeout=10, check=True).stdout.split("\0")
+except (OSError, subprocess.SubprocessError):
+    sys.exit(0)
+
+linked, stale = [], []
+for rel in filter(None, files):
+    if rel == "settings.example.json":
+        continue
+    src, dst = os.path.join(src_dir, rel), os.path.join(DOT, rel)
+    if not os.path.lexists(dst):
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            os.symlink(src, dst)
+            linked.append(rel)
+        except OSError:
+            stale.append(rel)
+    elif os.path.realpath(dst) != os.path.realpath(src):
+        stale.append(rel)
+
+if linked or stale:
+    parts = []
+    if linked:
+        parts.append("linked %s" % ", ".join(linked))
+    if stale:
+        parts.append("not linked to %s (replace by hand with ln -sfn): %s" % (src_dir, ", ".join(stale)))
+    print(json.dumps({"systemMessage": "armarium: " + "; ".join(parts)}))

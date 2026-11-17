@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs the repo gate before each commit. Enable once per clone: git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/bin/check"

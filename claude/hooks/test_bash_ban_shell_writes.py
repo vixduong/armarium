@@ -1,7 +1,7 @@
 """Self-test for bash-ban-shell-writes: python3 -I ~/.claude/hooks/test_bash_ban_shell_writes.py"""
 import json, os, subprocess, sys
 
-HOOK = os.path.expanduser("~/.claude/hooks/bash-ban-shell-writes")
+HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bash-ban-shell-writes")  # the hook beside this test, not the installed one
 
 BLOCK = [
     "cat > notes.md <<'EOF'\nhello > world\nEOF",

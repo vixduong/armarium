@@ -2,7 +2,7 @@
 Uses the real agent files in ~/.claude/agents (reviewer=sonnet, worker=sonnet, oracle=fable, explorer=haiku)."""
 import json, os, subprocess, sys
 
-HOOK = os.path.expanduser("~/.claude/hooks/agent-no-downgrade")
+HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent-no-downgrade")  # the hook beside this test, not the installed one
 
 BLOCK = [
     {"subagent_type": "reviewer", "model": "haiku"},

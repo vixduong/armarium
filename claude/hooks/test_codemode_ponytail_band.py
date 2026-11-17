@@ -2,7 +2,7 @@
 Builds a fake HOME with a ponytail install record, so the real plugin cache is never read or changed."""
 import json, os, subprocess, sys, tempfile
 
-HOOK = [os.path.expanduser("~/.claude/hooks/codemode-ponytail-band")]
+HOOK = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "codemode-ponytail-band")]  # beside this test
 if sys.platform == "win32":
     HOOK = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", HOOK[0] + ".ps1"]
 

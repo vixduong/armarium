@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Gate for this repo: bin/check [repo]. Runs every self-test and the static checks below; exit 1 on any problem.
+- JSON: both settings.example.json files parse.
+- Settings: every ~/.claude/... path a setting calls exists in claude/; hooks are executable.
+- Pointers: every `~/.claude/<file>` in claude/**/*.md exists in claude/ or ~/.claude; every bare `<name>.md` exists in claude/.
+- Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
+  unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
+Self-test: python3 -I bin/test_check.py"""
+import glob, json, os, re, subprocess, sys
+
+REPO = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), ".."))
+CLAUDE = os.path.join(REPO, "claude")
+HOME_DOT = os.path.expanduser("~/.claude")
+PROJECT_FILES = {"CLAUDE.md", "AGENTS.md", "SKILL.md", "README.md", "GLOSSARY.md", "architecture.md"}  # live in other repos
+problems = []
+
+
+def rel(p):
+    return os.path.relpath(p, REPO)
+
+
+# Self-tests
+tests = sorted(glob.glob(os.path.join(CLAUDE, "hooks", "test_*.py")) + glob.glob(os.path.join(REPO, "bin", "test_*.py")))
+for t in tests:
+    p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True)
+    if p.returncode:
+        problems.append("%s failed:\n%s" % (rel(t), (p.stdout + p.stderr)[-800:]))
+
+# JSON
+settings = {}  # file -> parsed settings
+for f in ["claude/settings.example.json", "windows/settings.example.json"]:
+    path = os.path.join(REPO, f)
+    if not os.path.exists(path):
+        if f.startswith("claude/"):
+            problems.append("%s is missing" % f)
+        continue
+    try:
+        with open(path, encoding="utf-8") as fh:
+            settings[f] = json.load(fh)
+    except ValueError as e:
+        problems.append("%s does not parse: %s" % (f, e))
+
+
+# Settings: paths the config calls
+def strings(x):
+    if isinstance(x, dict):
+        for v in x.values():
+            yield from strings(v)
+    elif isinstance(x, list):
+        for v in x:
+            yield from strings(v)
+    elif isinstance(x, str):
+        yield x
+
+
+unlocked = set()
+for f, data in settings.items():
+    homes = ["claude"] if f.startswith("claude/") else ["windows", "claude"]  # the Windows overlay falls back to claude/
+    for s in strings(data):
+        words = s.split()
+        for i, w in enumerate(words):
+            m = re.match(r"(?:~|C:/Users/YOU)/\.claude/(\S+)$", w)
+            if not m:
+                continue
+            target = next((os.path.join(REPO, h, m.group(1)) for h in homes if os.path.exists(os.path.join(REPO, h, m.group(1)))), None)
+            if target is None:
+                problems.append("%s calls %s, which %s lacks" % (f, w, " or ".join(h + "/" for h in homes)))
+            elif f.startswith("claude/") and m.group(1).startswith("hooks/") and not os.access(target, os.X_OK):
+                problems.append("%s is not executable" % rel(target))
+            if f.startswith("claude/") and w.endswith("/skill-model-invocable"):
+                unlocked.update(words[i + 1:])
+
+# Pointers
+names_in_repo = {os.path.basename(p) for p in glob.glob(os.path.join(CLAUDE, "**", "*"), recursive=True)}
+for md in glob.glob(os.path.join(CLAUDE, "**", "*.md"), recursive=True):
+    with open(md, encoding="utf-8") as fh:
+        text = fh.read()
+    for path in set(re.findall(r"~/\.claude/([\w./-]+\.\w+)", text)):
+        if not (os.path.exists(os.path.join(CLAUDE, path)) or os.path.exists(os.path.join(HOME_DOT, path))):
+            problems.append("%s points to ~/.claude/%s, which does not exist" % (rel(md), path))
+    for name in set(re.findall(r"`([\w.-]+\.md)`", text)):
+        if name not in names_in_repo and name not in PROJECT_FILES:
+            problems.append("%s points to %s, which claude/ lacks" % (rel(md), name))
+
+# Skills the model is told to call
+FRONT = re.compile(r"---\r?\n.*?\r?\n---\r?\n", re.S)  # same frontmatter rule as hooks/skill-model-invocable
+FLAG = re.compile(r"^disable-model-invocation:[ \t]*true[ \t]*\r?$", re.M)
+for md in [os.path.join(CLAUDE, "CLAUDE.md")] + glob.glob(os.path.join(CLAUDE, "rules", "*.md")):
+    if not os.path.exists(md):
+        continue
+    with open(md, encoding="utf-8") as fh:
+        text = fh.read()
+    for name in sorted(set(re.findall(r"`([\w:.-]+)`", text))):
+        skill = os.path.join(HOME_DOT, "skills", name.split(":")[-1], "SKILL.md")
+        if name in unlocked or not os.path.isfile(skill):
+            continue
+        with open(skill, encoding="utf-8", errors="replace") as fh:
+            front = FRONT.match(fh.read())
+            if front and FLAG.search(front.group(0)):
+                problems.append("%s tells the model to call `%s`, which is user-only: write `/%s`, or unlock it with skill-model-invocable"
+                                % (rel(md), name, name))
+
+for p in problems:
+    print("FAIL " + p)
+print("check: ok (%d self-tests)" % len(tests) if not problems else "check: %d problem(s)" % len(problems))
+sys.exit(1 if problems else 0)

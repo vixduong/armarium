@@ -66,6 +66,30 @@ A second `/implement` session on 2026-11-17 (same workspace, sonnet main, $5.40)
 | Lead skills named in `Flow:` must be called (`hooks/flow-skill-check`, Stop) | The Flow line named `lean-build` + `tdd`; neither was called, and the Exit had no lead-skill row | transcript: `Skill` calls (only `code-review`) | A Stop hook blocks once until the skill is called or listed as ✗ |
 | Contract edits need the user's agreement even when the contract is wrong (`CLAUDE.md` step 1) | Under the new rule the agent recorded the deviation but still edited the gateway spec, judging the spec itself wrong | transcript: two `Edit` calls on `specs/sibft-gateway-core.md` | Sentence extended: "also when the contract itself is wrong" |
 
+## Changed after the 2026-11-17 config review
+
+A static read of the repo against the installed `~/.claude`, done with the `writing-for-agents` skill.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| The model can call `review-animations` (`hooks/skill-model-invocable`, `settings.example.json` SessionStart) | Upstream ships the skill with `disable-model-invocation: true`, so the model could never call it, and `flow-skill-check` would block a `Flow:` line naming it. `skillOverrides` can only hide a skill, not unlock it, and `npx skills update` restores the line | the skill's frontmatter; the `skillOverrides` schema | A SessionStart hook removes the line from each skill it names; the steps in `CLAUDE.md` and `rules/` stay as they were |
+| Dead references removed (`CODING_STANDARDS.md`) | It pointed at `enforcement.md`, R01/R07–R09, AC-05/AC-09, "Run 1" and `--wb-*`, none of which exist here | `ls` and `grep` over the repo and `~/.claude` | References cut, rules kept; the "Derive" example kept without its file path |
+| `reviewer` at least on the author's tier (`CLAUDE.md` step 8, `agent-tuning.md` reviewer row) | The main session ran on opus and wrote the code; the reviewer and the security pass on it ran on the sonnet default, a weaker model checking a stronger one. With `settings.example.json` (main on haiku) sonnet is already above the author, so the default stays | `~/.claude/settings.json` `"model": "opus"`; this session's two review calls resolved to sonnet | Step 8 sets the reviewer's floor at the author's tier capped at opus (a fable author would otherwise spend the Fable budget on every review), opus for hard-to-undo diffs; per-call raises pass `agent-no-downgrade` |
+| Code graph line trimmed (`CLAUDE.md` Tools) | The `search_graph` → `trace_path` → `get_code_snippet` order is also injected every session by `cbm-session-reminder` and the MCP server instructions | session start context | Kept only the load and fallback steps |
+
+## Changed after the 2026-11-17 retro
+
+A `/retro` on the config-review session above (session 28008295, $4.45).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Repo gate (`bin/check`, `.githooks/pre-commit`, root `CLAUDE.md`) | The repo had no CI, no pre-commit and no check script. A dead `enforcement.md` pointer, a user-only skill the model was told to call, and a hook missing from the install were all found by reading | `ls .git/hooks` held only samples; `bin/check` on `HEAD` flags `enforcement.md` | `bin/check` runs every self-test plus the settings, pointer and user-only-skill checks; the pre-commit hook runs it |
+| New repo files reach `~/.claude` (`hooks/armarium-links`) | Per-file symlinks still missed new files: `skill-model-invocable` had to be linked by hand | the session's `ln -sfn` call | A SessionStart hook links tracked files `~/.claude` lacks and reports copies |
+| A ✗ counts in any reply (`hooks/flow-skill-check`, `CLAUDE.md` Route) | A skill named in an early `Flow:` line was blocked again at every later stop, because only the last reply was searched for its ✗ | two Stop blocks for `review-animations` in one session | ✗ in any reply of the session clears the name; the Flow line backticks only skills you will call |
+| `git grep` for ripple (`CLAUDE.md` Tools) | `grep -rn --include=*.md` died on a zsh glob ("no matches found") and the miss went unnoticed | the session's script 8 | Text search in a git repo starts with `git grep -n` |
+| A diff goes to an agent as a range (`CLAUDE.md` Subagents) | A pasted `git diff` reached the security sub-task cut to 359 characters by an output hook | the session's script 29 stderr | Prompt line: pass `git diff <base>` for the agent to run |
+| Removed lines checked (`CLAUDE.md` Route, Agent docs row) | An edit fused two bullets; the drop from 28 to 27 lines was reported as a win under "`wc -l` no higher" | `CODING_STANDARDS.md:7` before the fix | Done-when adds "`git diff` removes only lines you meant to remove" |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |

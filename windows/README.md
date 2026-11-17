@@ -1,6 +1,6 @@
 # Windows
 
-`windows/` overlays `claude/` for Windows 11 (Git for Windows, Windows PowerShell 5.1 or later). Shared files (CLAUDE.md, agents, rules, the two Python hooks and all three self-tests) come from `claude/`, so there is one copy to maintain. `settings.example.json` has the same keys and hook set as `claude/settings.example.json`; only the command strings and one matcher differ.
+`windows/` overlays `claude/` for Windows 11 (Git for Windows, Windows PowerShell 5.1 or later). Shared files (CLAUDE.md, agents, rules, the Python hooks and their self-tests) come from `claude/`, so there is one copy to maintain. `settings.example.json` has the same keys and hook set as `claude/settings.example.json`; only the command strings and one matcher differ.
 
 | Here | Port of (in `claude/`) |
 |---|---|
@@ -11,7 +11,7 @@
 | `hooks/memory-repo-symlink.ps1` | `hooks/memory-repo-symlink` (a junction, so no admin rights are needed) |
 | `hooks/codemode-ponytail-band.ps1` | `hooks/codemode-ponytail-band` |
 
-`agent-no-downgrade`, `bash-ban-shell-writes` and `flow-skill-check` are Python and run as they are, called with `python`.
+`agent-no-downgrade`, `bash-ban-shell-writes`, `flow-skill-check`, `skill-model-invocable` and `armarium-links` are Python and run as they are, called with `python`.
 
 ## Install
 
@@ -26,7 +26,7 @@ Then merge `settings.example.json` into `~\.claude\settings.json` by hand and re
 
 ## Requirements
 
-`python` on PATH (the two Python hooks), Git for Windows (the Bash tool), `rtk` (`winget install rtk-ai.rtk`), and optionally `codebase-memory-mcp`. `run-cli-hook.ps1` also looks in `~\.local\bin`, `~\.cargo\bin`, `%APPDATA%\npm`, scoop shims and the WinGet links folder. Self-tests: `python -I ~\.claude\hooks\test_agent_no_downgrade.py`, `test_bash_ban_shell_writes.py` and `test_codemode_ponytail_band.py`.
+`python` on PATH (the Python hooks), Git for Windows (the Bash tool), `rtk` (`winget install rtk-ai.rtk`), and optionally `codebase-memory-mcp`. `run-cli-hook.ps1` also looks in `~\.local\bin`, `~\.cargo\bin`, `%APPDATA%\npm`, scoop shims and the WinGet links folder. Self-tests: `python -I ~\.claude\hooks\test_agent_no_downgrade.py`, `test_bash_ban_shell_writes.py`, `test_codemode_ponytail_band.py`, `test_flow_skill_check.py`, `test_skill_model_invocable.py` and `test_armarium_links.py`. `armarium-links` stays silent after `install.ps1`, which copies rather than links. `test_armarium_links.py` creates symlinks, which Windows allows only with Developer Mode on or from an elevated shell.
 
 ## Known gaps
 

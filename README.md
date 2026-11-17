@@ -29,6 +29,7 @@ claude/                      mirrors ~/.claude
 ├── rules/                   frontend.md, video.md (stack gates)
 ├── skills/claude-md-audit/  audits how this config steered a session
 └── bin/                     sync-runner-tools.mjs, sync-copilot.mjs
+bin/check                    repo gate: self-tests and config checks; .githooks/pre-commit runs it
 docs/
 └── rule-origins.md          the incident and evidence behind each rule
 windows/                     PowerShell hooks, status line, settings and installer; see windows/README.md
@@ -37,12 +38,14 @@ windows/                     PowerShell hooks, status line, settings and install
 Hooks (each runs only once its entry from `settings.example.json` is in your `settings.json`):
 
 - `agent-no-downgrade` blocks an `Agent` call whose `model` is below that agent's frontmatter model, except the drops listed in `agent-tuning.md`. Self-test: `python3 -I hooks/test_agent_no_downgrade.py`.
-- `flow-skill-check` (Stop) blocks the end of a turn once when a `Flow:` line names a skill that has no `Skill` call in the session and the last reply does not list it as ✗. Self-test: `python3 -I hooks/test_flow_skill_check.py`.
+- `flow-skill-check` (Stop) blocks the end of a turn once when a `Flow:` line names a skill that has no `Skill` call in the session and no reply of the session lists it as ✗. Self-test: `python3 -I hooks/test_flow_skill_check.py`.
 - `bash-ban-raw-tools` blocks raw `cat`, `head`, `tail`, `find`, `grep`, `rg` and `wc` in Bash and points to the dedicated tools. A temporary unlock file lasts 10 minutes.
 - `bash-ban-shell-writes` blocks file writes from Bash: a heredoc into a file, `echo`/`printf`/`cat > file`, `sed -i`, `perl -i`, `tee`, and a python script fed on stdin. It lets through a heredoc into a command (`git commit -F -`), log redirects (`make check > log 2>&1`) and `/dev/null`. It shares the unlock file with `bash-ban-raw-tools`. Self-test: `python3 -I hooks/test_bash_ban_shell_writes.py`.
 - `run-cli-hook` finds a CLI such as `rtk` when the hook environment has no PATH, and exits 0 if it is not installed.
 - `cbm-session-reminder` and `cbm-subagent-reminder` add `codebase-memory-mcp` context when a session or subagent starts. They do nothing if the binary is missing.
 - `codemode-ponytail-band` runs at session start when `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`. Code Mode falls back to ordinary tools while a plugin's JS mod checks tool calls, and ponytail ships one (`hooks/claude-band.json`). Removing that entry from the cached `plugin.json` lets Code Mode start; a ponytail update puts it back, and this hook says so. Self-test: `python3 -I hooks/test_codemode_ponytail_band.py`.
+- `armarium-links` runs at session start when `~/.claude/CLAUDE.md` is a symlink into a clone of this repo. It links every file the repo tracks under `claude/` that `~/.claude` lacks, and reports files there that are copies, without replacing them. A copy install is left alone. Self-test: `python3 -I hooks/test_armarium_links.py`.
+- `skill-model-invocable <skill>…` runs at session start and removes `disable-model-invocation: true` from the frontmatter of each skill it names. An update such as `npx skills update` puts the line back, and the next session start removes it again. Self-test: `python3 -I hooks/test_skill_model_invocable.py`.
 - `memory-repo-symlink` runs at session start inside a git repo (outside one it does nothing). It moves `~/.claude/projects/<slug>/memory` into `<repo>/.claude/memory` and symlinks it back, so read it before you enable it. Add `**/.claude/memory/` to your global gitignore first, or the notes get committed with the repo. `CLAUDE.md` (Context) keeps each note to one decision with a `status`, so an old choice is marked `replaced` instead of sitting beside the new one.
 
 `skills/claude-md-audit` is a user-invoked skill (`/claude-md-audit <session-id>`). It reads a session's transcript and checks it against the config the session ran under. The checks cover:
@@ -63,7 +66,7 @@ The files above call out to other projects. None of them are copied here.
 | What | Used by | Where to get it |
 |---|---|---|
 | `jq` | hooks | `brew install jq` |
-| `python3` | `bash-ban-shell-writes`, `agent-no-downgrade`, `flow-skill-check` | preinstalled on macOS; your package manager elsewhere |
+| `python3` | `bash-ban-shell-writes`, `agent-no-downgrade`, `flow-skill-check`, `skill-model-invocable`, `armarium-links`, `bin/check` | preinstalled on macOS; your package manager elsewhere |
 | `rtk` | `settings.example.json` hook, `RTK.md` | `brew install rtk` ([rtk-ai.app](https://www.rtk-ai.app/)) |
 | `codebase-memory-mcp` | cbm hooks, the optional code graph in `CLAUDE.md` | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp), install script in its README |
 | `ponytail` plugin | `settings.example.json` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
@@ -86,7 +89,7 @@ Skills named in `CLAUDE.md`:
 | `security-review`, `update-config` | built into Claude Code |
 | `artifact-design`, `dataviz` | built into the Claude desktop app |
 | `retro` | source not recorded. `claude-md-audit` reads its category list (step 3), so you need your own copy or must edit that step. |
-| `review-animations` | a local skill with no public source, so it is not here. The animation review steps in `CLAUDE.md` and `rules/` call it, and you need your own version for them to work. |
+| `review-animations` | [emilkowalski/skills](https://github.com/emilkowalski/skills). It ships with `disable-model-invocation: true`, and the `skill-model-invocable` hook removes that line so the animation review steps in `CLAUDE.md` and `rules/` can call it. |
 
 ## Install
 
@@ -100,10 +103,17 @@ cp -Ri claude/. ~/.claude/
 
 `-i` asks before each overwrite. The copy leaves your `settings.json` alone: the repo ships only `settings.example.json`, so nothing changes your permissions until you choose to. Then install the requirements above.
 
+To follow the repo instead of copying it, link each file and enable the `armarium-links` hook, which links files added later. The loop skips a file that already exists in `~/.claude`, so move yours aside first if you want the repo's version:
+
+```bash
+git ls-files claude | grep -v settings.example.json | while read f; do d=~/.claude/${f#claude/}; mkdir -p "$(dirname "$d")"; [ -e "$d" ] || ln -s "$PWD/$f" "$d"; done
+```
+
+Before you commit here, run `git config core.hooksPath .githooks` once, so `bin/check` runs on each commit.
+
 Settings are opt-in. `settings.example.json` sets `defaultMode` to `auto` and turns on `skipDangerousModePermissionPrompt` and `skipAutoPermissionPrompt`, so Claude Code stops asking before many actions. It also pins my model choices (`haiku` as default, `claude-opus-5-5` as advisor). Copy into your own `settings.json` only the blocks you want, at least the `hooks` block if you want the hooks to run.
 
 ## Read before you copy
-- `CODING_STANDARDS.md` came from a larger project. It mentions `enforcement.md`, rule IDs such as R07 and AC-05, and a `--wb-*` token set, none of which are in this repo. Treat those as examples to rewrite.
 - `CLAUDE.md` points at `~/.claude/commands/`, `~/.claude/skills/` and `~/.claude/projects/`. Those are folders on my machine, not files in this repo.
 - `claude-md-audit` writes its reports to `/Users/Shared/claude-evals/` and adds rows to `~/projects/armarium/docs/rule-origins.md`. Change both paths in its step 7. Its prices in `session_audit.py` date from November 2026.
 - I run macOS and zsh, and I have not tested any of this on Linux or Windows.

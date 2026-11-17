@@ -96,7 +96,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "~/.claude/hooks/armarium-links",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "~/.claude/hooks/memory-repo-symlink",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/skill-model-invocable review-animations",
             "timeout": 10
           },
           {
