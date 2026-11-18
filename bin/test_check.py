@@ -133,5 +133,18 @@ case("model told to call a user-only plugin skill", 1, "/hf:hf",
      files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hf:hf` | done |\n"},
      home_files=plugins({"hf": "1.0"}, {"hf/1.0/skills/hf/SKILL.md": "---\nname: hf\ndisable-model-invocation: true\n---\n"}))
 
+case("plugin agent named plugin:agent passes as a lead", 0, "check: ok",
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hf:scout` agent | done |\n"},
+     home_files=plugins({"hf": "1.0"}, {"hf/1.0/agents/scout.md": "---\nname: scout\n---\n"}))
+case("user-only plugin skill named bare gets the qualified /plugin:skill fix", 1, "write `/ctx:stats`",
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `stats` | done |\n"},
+     home_files=plugins({"ctx": "2.0"}, {"ctx/2.0/skills/stats/SKILL.md": "---\nname: stats\ndisable-model-invocation: true\n---\n"}))
+case("plugin the settings declare but this machine lacks is skipped", 0, "check: ok",
+     settings=dict(SETTINGS, enabledPlugins={"hf@mk": False}),
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hf:hf` | done |\n"})
+case("plugin prefix neither declared nor installed still fails", 1, "hx:hf",
+     settings=dict(SETTINGS, enabledPlugins={"hf@mk": False}),
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hx:hf` | done |\n"})
+
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)
