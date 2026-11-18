@@ -10,7 +10,7 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
 
 1. **Load** `writing-for-agents` (Skill tool). Every fix you propose edits a document an agent reads.
 
-2. **Collect facts.** Session ids come from the user, or default to the current session. A session still running → wait first: `scripts/wait_quiet.py <transcript> [pid]` with Bash `run_in_background`. Never pause a session by signal: `SIGSTOP` on a foreground TUI does not resume. Then run:
+2. **Collect facts.** Session ids come from the user. The current session as the target → tell the user to run `/claude-md-audit <id>` from a new session, and stop: an audit in place rereads the whole work context on every request. A session still running → wait first: `scripts/wait_quiet.py <transcript> [pid]` with Bash `run_in_background`. Never pause a session by signal: `SIGSTOP` on a foreground TUI does not resume. Then run:
    ```bash
    python3 -I ~/.claude/skills/claude-md-audit/scripts/session_audit.py <session-id>
    ```
@@ -30,6 +30,7 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
 
 7. **Report** to `/Users/Shared/claude-evals/session-<id8>/report.md`, never inside the project repo. Sections in this order:
    - outcome and cost table
+   - checks table: every check below, its verdict (✓, ✗, n/a) and evidence
    - findings, most severe first, each with evidence (transcript line or `file:line`) and its fix
    - what worked
    - still open

@@ -15,7 +15,8 @@ implementation and no context beyond the brief.
   `blame`). Never run anything that writes, builds, or runs tests; report the
   test commands the parent should run.
 - A hook blocks `| head` and `| tail` in Bash. Size a diff with `git diff --stat`,
-  then read it file by file with `git diff <range> -- <file>`.
+  then read it file by file with `git diff -U0 <range> -- <file>` (a hook folds
+  long output into a search pointer) and `Read` the changed lines with `offset`/`limit`.
 - Start from the exact diff or named source seam. Given a commit range or
   branch, get the diff yourself with `git diff`. If `git` fails or the range is
   unclear, say so; claim only the range you actually reviewed.

@@ -121,6 +121,19 @@ A ticket session on 2026-11-18 in the Spring/Oracle workspace, which spans sever
 | Plan Done-when names the step 4 gates (`CLAUDE.md` Route, Plan row) | A money-path plan with a data model and a core-schema join went out with neither `reviewer` nor `oracle`; no Done-when item showed it | lines 364 (Flow) and 727 (plan reply) | New item: risk area → `reviewer` on the plan; one-way door → `oracle`, or the approved doc cited |
 | An item with any exception is ✗ (`CLAUDE.md` Exit) | ✓ lines carried caveats: "red first" listed a never-red test as an exception, "gate ran the changed tests" listed 3 skipped new tests. The 2026-11-17 audit saw the same "✓ with a footnote" | line 2987; the 2026-11-17 row on the P0-only re-check | Exit: an item with any exception is ✗, the exception its reason |
 
+## Changed after the 999024f4 session audit
+
+A feature session on 2026-11-18 in the same Spring/Oracle workspace, two rounds on one branch, sonnet main, six sonnet reviewers, then an in-session self-audit: $6.60 in total. A second audit ran from a new session; an opus `reviewer` re-derived its numbers. Report: `claude-evals/session-999024f4/report-v2.md` (local).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Red means a failed assertion (`CLAUDE.md` Route, Code row) | "✓ seen red before code" rested on three compile errors ("method is undefined", "cannot find symbol") and one real red; the old wording "the failure names the missing behavior" let a compile error pass | transcript lines 688, 1013, 1830, 2022; reply 2112 | Red = the test ran and failed an assertion; a compile error or a run with no test is not red |
+| Plan acceptance checks in the Code Done-when (`CLAUDE.md` Route, Code row) | Plan check 4 (replay case 924 through sim) never ran, and neither final reply said so | plan file line 30; no sim command in the transcript | New item: every acceptance check the plan lists ran, else ✗ |
+| Reviewer model owned by step 8 (`agent-tuning.md` reviewer row) | The tuning row put every security review on fable and listed concurrency for opus; step 8 had neither. The agent reads tuning only when it changes a model, so all 7 reviewer calls ran sonnet | lines 1379, 1381, 1654, 1934, 1936, 2091, 2677 | The row defers to step 8 for opus; fable no longer covers security review (owner's choice: cost stays as is) |
+| Audit from a new session (`claude-md-audit` step 2) | The in-session audit cost $1.95 (29.5%) at a median 309k context per request against 173k during the work, and its own cost table left that out | report-v2 cost table | The current session as target → ask for a run from a new session |
+| Checks table in the audit report (`claude-md-audit` step 7) | The self-audit gave no verdict for Models, Plan gates or Verification and so missed the model conflict above | `report.md` against report-v2 | Report gets one row per check with its verdict |
+| Reviewer reads hunks, then the file (`agents/reviewer.md`) | 3 of 6 reviewers said their `git diff` output was folded | the three reviewer reports | `git diff -U0` per file, then `Read` the changed lines |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |
