@@ -2,7 +2,7 @@
 """video_ref.py SOURCE [options]: turn a video link or file into reference material
 (frames per scene, contact sheet, subtitles as text, index.json). Used by the /video-ref skill.
 Self-test: python3 -I test_video_ref.py"""
-import argparse, json, os, re, shutil, subprocess, sys, unicodedata
+import argparse, json, os, re, shutil, subprocess, sys, tempfile, unicodedata
 from urllib.parse import urlparse
 
 
@@ -58,8 +58,8 @@ class Fail(Exception):
         self.code = code
 
 
-def run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+def run(cmd, cwd=None):
+    return subprocess.run(cmd, capture_output=True, text=True, errors="replace", cwd=cwd)
 
 
 def need(tool):
@@ -88,6 +88,7 @@ def probe(path):
 
 def frame_times(video, duration, threshold, cap):
     """Scene-cut times plus t=0; under 6 picks, add 6 evenly spaced times; at most cap, evenly kept."""
+    # shortcut: the scene score reads luma only, so a hue-only cut is missed; the even samples cover short clips
     p = run(["ffmpeg", "-hide_banner", "-nostats", "-i", video, "-an",
              "-vf", "select='gt(scene,%s)',showinfo" % threshold, "-f", "null", "-"])
     times = sorted({0.0, *(round(t, 3) for t in parse_showinfo(p.stderr) if t > 0)})
@@ -126,12 +127,12 @@ def fetch(url, out, images_only, browser):
         p = run(["yt-dlp", *cookies, "--ignore-errors", "--no-playlist", "--restrict-filenames", "--max-filesize", "1G",
                  "-f", "bv*[height<=1080]+ba/b[height<=1080]/b", "--write-info-json",
                  "--write-subs", "--write-auto-subs", "--sub-langs", "vi.*,en.*", "--convert-subs", "srt",
-                 "-o", os.path.join(out, "source.%(ext)s"), "--", url])
+                 "-o", os.path.join(out, "source.%(ext)s"), "--", url], cwd=out)  # cwd: yt-dlp reads ./yt-dlp.conf, which may hold --exec
         if p.returncode:
             errors.append("yt-dlp: " + tail(p.stderr))
     if not files_with(out, VIDEO_EXT):
         need("gallery-dl")
-        p = run(["gallery-dl", *cookies, "-D", os.path.join(out, "images"), "--", url])
+        p = run(["gallery-dl", *cookies, "-D", os.path.join(out, "images"), "--", url], cwd=out)
         if p.returncode:
             errors.append("gallery-dl: " + tail(p.stderr))
     if not files_with(out, VIDEO_EXT) and not files_with(os.path.join(out, "images"), IMAGE_EXT | VIDEO_EXT):
@@ -200,7 +201,7 @@ def main(argv):
     ap.add_argument("--images", action="store_true", help="link is an image post: use gallery-dl only")
     ap.add_argument("--browser", help="read login cookies from this browser (chrome, safari, firefox...)")
     args = ap.parse_args(argv)
-    work, created = None, False
+    work, created, done = None, False, False
     try:
         try:
             kind, source = check_source(args.source)
@@ -212,22 +213,27 @@ def main(argv):
             raise Fail("--out %s is not empty" % args.out, 2)
         for tool in ["ffmpeg", "ffprobe"] + ([("gallery-dl" if args.images else "yt-dlp")] if kind == "url" else []):
             need(tool)
-        base = os.path.dirname(os.path.abspath(args.out)) if args.out else DEFAULT_BASE
-        work = os.path.abspath(args.out) if args.out else os.path.join(base, ".incoming-%d" % os.getpid())
-        created = not os.path.exists(work)
-        os.makedirs(work, exist_ok=True)
+        if args.out:
+            work = os.path.abspath(args.out)
+            created = not os.path.exists(work)
+            os.makedirs(work, exist_ok=True)
+        else:
+            os.makedirs(DEFAULT_BASE, exist_ok=True)
+            work, created = tempfile.mkdtemp(prefix=".incoming-", dir=DEFAULT_BASE), True
         info = fetch(source, work, args.images, args.browser) if kind == "url" else {}
         if not args.out:
             stem = args.name or info.get("title") or os.path.splitext(os.path.basename(source))[0]
-            final = unique_dir(base, slugify(stem))
+            final = unique_dir(DEFAULT_BASE, slugify(stem))
             os.rename(work, final)
             work = final
         index = build(work, args, kind, source, info)
+        done = True
     except Fail as e:
-        if created:  # only a folder this run made; a half-filled one would look like a finished reference
-            shutil.rmtree(work, ignore_errors=True)
         print("video_ref: " + str(e), file=sys.stderr)
         return e.code
+    finally:
+        if created and not done:  # only a folder this run made; a half-filled one would look like a finished reference
+            shutil.rmtree(work, ignore_errors=True)
     print(work)
     print("%d frames, %d transcript(s), %d image(s); open contact.jpg first" % (len(index["frames"]), len(index["transcripts"]), index["images"]))
     return 0

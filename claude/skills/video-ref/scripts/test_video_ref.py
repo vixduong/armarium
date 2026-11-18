@@ -69,8 +69,9 @@ class SrtToText(unittest.TestCase):
         self.assertEqual(vr.srt_to_text(""), "")
 
 def three_colour_video(path):
-    """6 s at 10 fps: red, green, blue for 2 s each, so scene cuts sit at 2 s and 4 s."""
-    src = ";".join("color=%s:s=160x90:d=2:r=10[v%d]" % (c, i) for i, c in enumerate(["red", "green", "blue"]))
+    """6 s at 10 fps: black 1.4 s, white 3.2 s, gray 1.4 s. The cuts at 1.4 s and 4.6 s are off the even-sampling grid,
+    and each changes brightness (ffmpeg's scene score reads luma only: pure red to pure green scores 0)."""
+    src = ";".join("color=%s:s=160x90:d=%s:r=10[v%d]" % (c, d, i) for i, (c, d) in enumerate([("black", 1.4), ("white", 3.2), ("gray", 1.4)]))
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-filter_complex", src + ";[v0][v1][v2]concat=n=3:v=1[out]",
                     "-map", "[out]", "-pix_fmt", "yuv420p", path], check=True)
 
@@ -88,8 +89,8 @@ class LocalFile(unittest.TestCase):
             times = [fr["t"] for fr in index["frames"]]
             self.assertGreaterEqual(len(times), 6)
             self.assertEqual(times, sorted(times))
-            for cut in (2.0, 4.0):
-                self.assertTrue(any(abs(t - cut) < 0.25 for t in times), "no frame near the cut at %ss: %s" % (cut, times))
+            for cut in (1.4, 4.6):
+                self.assertTrue(any(abs(t - cut) < 0.1 for t in times), "no frame at the cut at %ss: %s" % (cut, times))
             for fr in index["frames"]:
                 self.assertTrue(os.path.isfile(os.path.join(out, fr["file"])))
             self.assertTrue(os.path.getsize(os.path.join(out, "contact.jpg")) > 0)
@@ -108,6 +109,66 @@ class MissingTool(unittest.TestCase):
             self.assertEqual(p.returncode, 3, p.stderr)
             self.assertIn("brew install yt-dlp", p.stderr)
             self.assertFalse(os.path.exists(out), "a failed run left %s behind" % out)
+
+FAKE_YTDLP = """#!%s
+import json, os, shutil, sys
+out = os.path.dirname(sys.argv[sys.argv.index("-o") + 1])
+with open(os.environ["FAKE_LOG"], "w") as f:
+    f.write(os.getcwd())
+shutil.copy(os.environ["FAKE_VIDEO"], os.path.join(out, "source.mp4"))
+with open(os.path.join(out, "source.info.json"), "w") as f:
+    f.write("{not json" if os.environ.get("FAKE_MODE") == "badjson" else json.dumps({"title": "Fake Title"}))
+""" % sys.executable
+
+
+@unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg missing")
+class FakeDownload(unittest.TestCase):
+    """A fake yt-dlp on PATH copies a local clip, so the link path runs offline."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.bin = os.path.join(self.tmp, "bin")
+        os.mkdir(self.bin)
+        for tool in ("ffmpeg", "ffprobe"):
+            os.symlink(shutil.which(tool), os.path.join(self.bin, tool))
+        with open(os.path.join(self.bin, "yt-dlp"), "w") as f:
+            f.write(FAKE_YTDLP)
+        os.chmod(os.path.join(self.bin, "yt-dlp"), 0o755)
+        self.video = os.path.join(self.tmp, "clip.mp4")
+        three_colour_video(self.video)
+        self.log = os.path.join(self.tmp, "cwd.log")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_cli(self, *args, cwd=None, mode="ok"):
+        env = {"PATH": self.bin, "HOME": self.tmp, "FAKE_LOG": self.log, "FAKE_VIDEO": self.video, "FAKE_MODE": mode}
+        return subprocess.run([sys.executable, "-I", os.path.join(HERE, "video_ref.py"), "https://example.com/v?id=1", *args],
+                              capture_output=True, text=True, env=env, cwd=cwd or self.tmp)
+
+    def test_downloader_runs_inside_the_output_folder_not_the_callers_project(self):
+        proj, out = os.path.join(self.tmp, "proj"), os.path.join(self.tmp, "out")
+        os.mkdir(proj)
+        with open(os.path.join(proj, "yt-dlp.conf"), "w") as f:
+            f.write('--exec "touch pwned"\n')
+        p = self.run_cli("--out", out, cwd=proj)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        with open(self.log) as f:
+            self.assertEqual(os.path.realpath(f.read()), os.path.realpath(out), "yt-dlp ran where a repo's yt-dlp.conf applies")
+
+    def test_unexpected_error_leaves_no_incoming_folder(self):
+        p = self.run_cli(mode="badjson")
+        self.assertNotEqual(p.returncode, 0)
+        base = os.path.join(self.tmp, "Movies", "video-refs")
+        left = [d for d in os.listdir(base) if d.startswith(".incoming")] if os.path.isdir(base) else []
+        self.assertEqual(left, [], "half-done work folder left behind")
+
+    def test_default_folder_is_named_from_the_title_and_never_reused(self):
+        first, second = self.run_cli(), self.run_cli()
+        self.assertEqual((first.returncode, second.returncode), (0, 0), first.stderr + second.stderr)
+        base = os.path.join(self.tmp, "Movies", "video-refs")
+        self.assertEqual(sorted(os.listdir(base)), ["fake-title", "fake-title-2"])
+        self.assertTrue(os.path.isfile(os.path.join(base, "fake-title-2", "index.json")))
 
 if __name__ == "__main__":
     unittest.main()
