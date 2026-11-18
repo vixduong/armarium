@@ -6,7 +6,7 @@ Write `Flow: <row>` before the first tool call (a question answered in chat need
 | Task | Flow | Lead skill, invoked before the first draft or line of code | Done when (every item true, with evidence) |
 |---|---|---|---|
 | Code: feature, bug, refactor, migration | Code flow | per step 1 | gate command green and it ran the changed tests (skip count stated) · every P0/P1 fixed, then the P0-only re-check ran · step 8 reviews ran · diff has untrusted input or auth/secrets → `security-review` ran · each behavior's test seen red before its code (the failure names the missing behavior), else ✗ with the reason |
-| Plan or spec only (someone else codes) | Code flow steps 1, 3, 4; the plan file replaces plan mode | per step 1 | plan names every file, the gate command, and independent acceptance checks |
+| Plan or spec only (someone else codes) | Code flow steps 1, 3, 4; the plan file replaces plan mode | per step 1 | plan names every file, the gate command, and independent acceptance checks · risk area → `reviewer` ran on the plan; one-way door → `oracle` ran, or the approved doc that settles it is cited |
 | UI page or component in a repo | Code flow + `~/.claude/rules/frontend.md` | `ui-ux-pro-max` | every width and state frontend gate step 4 lists shot and viewed; one missing → ✗ |
 | Artifact, page, dashboard | Deliverable flow + frontend gate items 4, 5, 7 | `artifact-design`; chart or stat tile → `dataviz` | published, and the rendered page viewed at 375 px and desktop |
 | Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated · a `reviewer` call re-derived the headline numbers and claims from the raw data |
@@ -18,7 +18,7 @@ Write `Flow: <row>` before the first tool call (a question answered in chat need
 | Claude Code settings, hooks, permissions | `update-config` | `update-config` | settings file parses (`jq empty`) |
 
 Every row whose output has prose a person reads (report, page, doc, message) also ends with `humanizer` on the delivered version.
-**Exit**: every final reply except a chat answer, a short bug-fix reply included, lists the row's Done-when items, each ✓ with its evidence (command, `file:line`, skill call) or ✗ with the reason. A skill's evidence is its `Skill` tool call after the `Flow:` line that names it, or the user's `/skill` command that started the task; a name in the `Flow:` line is not a call. A lead skill left out appears there as ✗.
+**Exit**: every final reply except a chat answer, a short bug-fix reply included, lists the row's Done-when items, each ✓ with its evidence (command, `file:line`, skill call) or ✗ with the reason; an item with any exception is ✗, the exception its reason. A skill's evidence is its `Skill` tool call after the `Flow:` line that names it, or the user's `/skill` command that started the task; a name in the `Flow:` line is not a call. A lead skill left out appears there as ✗.
 
 ## Principles
 DRY/KISS/YAGNI/SSOT. Ask before destructive.
@@ -52,10 +52,10 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 7. **Verify**: the gate command passes; re-run the step 3 search: every site updated; UI change → screenshots per `rules/frontend.md`; rendered video → frames per `rules/video.md`. Fail → fix root cause.
 8. **Review**: after 7 is green; each range reviewed once (a review `/implement` already ran counts; `/implement`'s closing `code-review` covers only commits no earlier review covered).
    - Diff Big → `reviewer` ← changed files + acceptance criteria (a plan or acceptance file another agent wrote counts as criteria). A spec or ticket a person wrote → `code-review` instead. Last open ticket of a spec → `code-review` on the whole spec range.
-   - Untrusted input or auth/secrets → also a security review, whatever the size: `git remote` lists a remote → `security-review`; none (it needs `origin/HEAD`) → a separate `reviewer` call with a security-only prompt on the same diff, never folded into the general review.
+   - Untrusted input or auth/secrets → also a security review, whatever the size: `git rev-parse origin/HEAD` succeeds in the cwd → `security-review`; otherwise, or when it fails → a separate `reviewer` call with a security-only prompt on the same diff, never folded into the general review.
    - Animation in the diff → also `review-animations`: UI per frontend gate step 6, rendered video per video gate step 5.
    - Model: every `reviewer` call runs at least on the tier that wrote the code, capped at opus (main session on opus → `model: "opus"`), and at least opus when hard to undo (auth/permission, secrets, money, migration), whatever the size; otherwise its default sonnet/high. A review that still missed a bug → one tier up per `~/.claude/agent-tuning.md`.
-   - Fix every P0/P1 → back to 7 → one P0-only re-check. Still P0 after 2 rounds → stop and report. P2 → list in the final reply.
+   - Fix every P0/P1 → back to 7 → one P0-only re-check. Still P0 after 2 rounds → stop and report. A P0/P1 you cannot fix (it needs access, an environment or a decision you lack) stays ✗ in Exit, naming what it needs and from whom. P2 → list in the final reply.
 
 **New gate** for a stack or medium: `~/.claude/rules/<name>.md`, `paths:` frontmatter, first line `Invoke <skill> FIRST`, then a numbered self-check; add its row to Route.
 

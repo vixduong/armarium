@@ -43,7 +43,7 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
 - **Missing Done-when items**: a CLAUDE.md step the agent broke that no Done-when item covers, so the Exit table never showed it (e.g. step 6 red-first).
 - **TDD**: per worker and per behavior, the order of test write, test run with its failure reason, and code write. Read the run output: an exit 1 from a collection error or a refused DB connection is not red. Red evidence that arrives only after the code (guard removed, test re-run) counts as partial.
 - **Plan gates**: `oracle` called for a one-way door unless an approved doc settled it (cite the doc). A plan in a risk area went to `reviewer`.
-- **Reviews**: list each review agent with the commit range it covered. The same range reviewed twice is cost to explain. Security review: `git remote` present → `security-review`; otherwise a separate security-only `reviewer`.
+- **Reviews**: list each review agent with the commit range it covered. The same range reviewed twice is cost to explain. Security review: the branch CLAUDE.md step 8 picks, and its fallback when the skill fails.
 - **Models**: every per-call `model` against `agent-tuning.md`. Price each escalation in USD and set it against what it found (P0/P1 count).
 - **Conflicts**: a skill step against a CLAUDE.md step (e.g. `/implement` → `code-review` vs step 8). Note which one the agent followed.
 - **Cost sinks**: the three biggest agents by USD. Main thread context per request; recon or fix rounds the main did itself.

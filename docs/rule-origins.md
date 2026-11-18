@@ -110,6 +110,17 @@ A self-audit of a session with seven deliverables ($21.22). Report: `/Users/Shar
 | The Stop hook reads the final reply (`hooks/flow-skill-check`) | A reply with the right ✗ line was blocked in the same second it was written | lines 612 to 615 | The hook also reads `last_assistant_message` from its input |
 | Long `$` output in REPL scripts (`CLAUDE.md` Tools) | context-mode folded `$` output over 2 KB four times, and `| head` was blocked twice | the report's finding 5 | Send it to a scratchpad log and read with `file().slice()` |
 
+## Changed after the 68085871 session audit
+
+A ticket session on 2026-11-18 in the Spring/Oracle workspace, which spans several git repos: sonnet main, one opus `reviewer`, $10.50. A `reviewer` re-derived the numbers. Report: `claude-evals/session-68085871/report.md` (local).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| A P0/P1 the agent cannot fix stays ✗ (`CLAUDE.md` step 8) | The reviewer found 2 P1s that needed core DB access and a working e2e stack; the Exit marked review ✓ with "no P0" | transcript lines 2786 (handback) and 2987 (final reply) | One sentence: it stays ✗ in Exit, naming what it needs and from whom |
+| Security review keys on `origin/HEAD` in the cwd (`CLAUDE.md` step 8, `claude-md-audit` Reviews check) | The cwd was a root repo without a remote, the code sat in sub-repos with one; `security-review` failed on `origin/HEAD` and no security-only `reviewer` followed | lines 2775 and 2776 | Test `git rev-parse origin/HEAD` in the cwd; fall back to the security-only `reviewer` also when the skill fails. The audit skill points to step 8 instead of restating it |
+| Plan Done-when names the step 4 gates (`CLAUDE.md` Route, Plan row) | A money-path plan with a data model and a core-schema join went out with neither `reviewer` nor `oracle`; no Done-when item showed it | lines 364 (Flow) and 727 (plan reply) | New item: risk area → `reviewer` on the plan; one-way door → `oracle`, or the approved doc cited |
+| An item with any exception is ✗ (`CLAUDE.md` Exit) | ✓ lines carried caveats: "red first" listed a never-red test as an exception, "gate ran the changed tests" listed 3 skipped new tests. The 2026-11-17 audit saw the same "✓ with a footnote" | line 2987; the 2026-11-17 row on the P0-only re-check | Exit: an item with any exception is ✗, the exception its reason |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |
