@@ -7,6 +7,7 @@ paths:
 ---
 # Video gate
 Invoke the lead skills of CLAUDE.md's Video row FIRST.
+The user gives a reference video or link → suggest `/video-ref <link>` (frames per scene, contact sheet, subtitles).
 
 1. **Reading time**: the storyboard lists, per scene, the words on screen and the seconds the scene is fully visible after fade-in and fade-out. Words × 0.3 s fits inside that time, counting on-screen text and subtitle together while both are visible; otherwise lengthen the scene or split the text. Count words with a script over the exact strings that render.
 2. **No blank frames**: scan every frame of the render (`ffmpeg -vf signalstats`, flag frames where YMIN == YMAX). Scene boundaries count: fade-in starts above opacity 0, or scenes overlap.

@@ -81,6 +81,8 @@ case("broken JSON in windows settings", 1, "windows/settings.example.json",
      files={"windows/settings.example.json": "{"})
 case("a failing hook self-test", 1, "test_broken.py",
      files={"claude/hooks/test_broken.py": "import sys; sys.exit(1)\n"})
+case("a failing skill script self-test", 1, "test_skill_broken.py",
+     files={"claude/skills/demo/scripts/test_skill_broken.py": "import sys; sys.exit(1)\n"})
 
 case("missing claude/settings.example.json", 1, "claude/settings.example.json",
      pre=lambda repo: os.remove(os.path.join(repo, "claude/settings.example.json")))
