@@ -159,16 +159,27 @@ class FakeDownload(unittest.TestCase):
     def test_unexpected_error_leaves_no_incoming_folder(self):
         p = self.run_cli(mode="badjson")
         self.assertNotEqual(p.returncode, 0)
-        base = os.path.join(self.tmp, "Movies", "video-refs")
+        base = os.path.join(self.tmp, "video-refs")
         left = [d for d in os.listdir(base) if d.startswith(".incoming")] if os.path.isdir(base) else []
         self.assertEqual(left, [], "half-done work folder left behind")
 
-    def test_default_folder_is_named_from_the_title_and_never_reused(self):
-        first, second = self.run_cli(), self.run_cli()
+    def test_default_folder_is_video_refs_in_the_current_project_named_from_the_title(self):
+        proj = os.path.join(self.tmp, "proj")
+        os.mkdir(proj)
+        first, second = self.run_cli(cwd=proj), self.run_cli(cwd=proj)
         self.assertEqual((first.returncode, second.returncode), (0, 0), first.stderr + second.stderr)
-        base = os.path.join(self.tmp, "Movies", "video-refs")
-        self.assertEqual(sorted(os.listdir(base)), ["fake-title", "fake-title-2"])
+        base = os.path.join(proj, "video-refs")
+        self.assertTrue(os.path.isdir(base), "no video-refs/ in the project")
+        self.assertEqual(sorted(os.listdir(base)), [".gitignore", "fake-title", "fake-title-2"])
         self.assertTrue(os.path.isfile(os.path.join(base, "fake-title-2", "index.json")))
+        with open(os.path.join(base, ".gitignore")) as f:
+            self.assertEqual(f.read(), "*\n", "downloads must stay out of the project's git")
+
+    def test_dir_sets_the_parent_folder(self):
+        refs = os.path.join(self.tmp, "my", "refs")
+        p = self.run_cli("--dir", refs)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertTrue(os.path.isfile(os.path.join(refs, "fake-title", "index.json")))
 
 if __name__ == "__main__":
     unittest.main()

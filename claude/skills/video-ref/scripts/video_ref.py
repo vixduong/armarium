@@ -49,7 +49,7 @@ def srt_to_text(srt):
 
 VIDEO_EXT = {"mp4", "mkv", "webm", "mov", "m4v"}
 IMAGE_EXT = {"jpg", "jpeg", "png", "webp", "gif", "heic", "avif"}
-DEFAULT_BASE = os.path.expanduser("~/Movies/video-refs")
+DEFAULT_DIR = "video-refs"  # under the current project; holds its own .gitignore so downloads stay out of git
 
 
 class Fail(Exception):
@@ -195,7 +195,8 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="video_ref.py", description=__doc__.splitlines()[0])
     ap.add_argument("source", help="http(s) link or local video file")
     ap.add_argument("--name", help="folder name (default: title or file name)")
-    ap.add_argument("--out", help="exact output folder (default: %s/<name>)" % DEFAULT_BASE)
+    ap.add_argument("--dir", help="parent folder (default: ./%s in the current project)" % DEFAULT_DIR)
+    ap.add_argument("--out", help="exact output folder (overrides --dir and --name)")
     ap.add_argument("--max-frames", type=int, default=40)
     ap.add_argument("--threshold", type=float, default=0.3, help="scene-change score, 0..1")
     ap.add_argument("--images", action="store_true", help="link is an image post: use gallery-dl only")
@@ -218,12 +219,16 @@ def main(argv):
             created = not os.path.exists(work)
             os.makedirs(work, exist_ok=True)
         else:
-            os.makedirs(DEFAULT_BASE, exist_ok=True)
-            work, created = tempfile.mkdtemp(prefix=".incoming-", dir=DEFAULT_BASE), True
+            base = os.path.abspath(args.dir or DEFAULT_DIR)
+            if not os.path.exists(base):
+                os.makedirs(base)
+                with open(os.path.join(base, ".gitignore"), "w") as f:
+                    f.write("*\n")
+            work, created = tempfile.mkdtemp(prefix=".incoming-", dir=base), True
         info = fetch(source, work, args.images, args.browser) if kind == "url" else {}
         if not args.out:
             stem = args.name or info.get("title") or os.path.splitext(os.path.basename(source))[0]
-            final = unique_dir(DEFAULT_BASE, slugify(stem))
+            final = unique_dir(base, slugify(stem))
             os.rename(work, final)
             work = final
         index = build(work, args, kind, source, info)
