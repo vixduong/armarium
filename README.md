@@ -72,7 +72,7 @@ The files above call out to other projects. None of them are copied here.
 | `ponytail` plugin | `settings.example.json` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
 | `humanizer` plugin | `settings.example.json`, writing flow | [blader/humanizer](https://github.com/blader/humanizer) |
 | `context-mode` plugin | `settings.example.json`, tool rules | [mksglu/context-mode](https://github.com/mksglu/context-mode) |
-| `context7` plugin | `settings.example.json`, docs lookups | `claude-plugins-official` marketplace |
+| `context7` plugin | `settings.example.json` (off by default; optional docs lookups) | `claude-plugins-official` marketplace |
 
 `codebase-memory-mcp` re-indexes git repos when they change. A folder with no git stays at its first index unless you run `index_repository` again or set `config set watch_non_git true`. Each linked git worktree becomes its own permanent index; `config set ignore_worktrees true` skips them.
 

@@ -134,6 +134,14 @@ A feature session on 2026-11-18 in the same Spring/Oracle workspace, two rounds 
 | Checks table in the audit report (`claude-md-audit` step 7) | The self-audit gave no verdict for Models, Plan gates or Verification and so missed the model conflict above | `report.md` against report-v2 | Report gets one row per check with its verdict |
 | Reviewer reads hunks, then the file (`agents/reviewer.md`) | 3 of 6 reviewers said their `git diff` output was folded | the three reviewer reports | `git diff -U0` per file, then `Read` the changed lines |
 
+## Changed after the 2026-11-18 doctor scan
+
+A `/doctor` run over the 50 newest sessions (2026-11-10 to 2026-11-18, every project). Local data: `claude-evals/doctor-20261118/`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Docs/web: library/API docs → context7 first (`CLAUDE.md` Tools) | The line pointed at a plugin that no session used; the scan found the plugin's tools called 0 times, against 285 for `context-mode` and 63 for `codebase-memory-mcp`. It had 2 uses since install, the last on 2026-11-05 | `transcripts.txt` MCP counts; `pluginUsage` in `~/.claude.json` | Plugin set to `false` in both `settings.example.json` files and marked off by default in the README; the line now says WebSearch |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |

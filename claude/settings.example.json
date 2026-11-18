@@ -132,7 +132,7 @@
   },
   "enabledPlugins": {
     "ponytail@ponytail": true,
-    "context7@claude-plugins-official": true,
+    "context7@claude-plugins-official": false,
     "humanizer@humanizer": true,
     "context-mode@context-mode": true
   },

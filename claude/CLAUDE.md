@@ -63,7 +63,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 - **Code graph (CBM), optional**: its tools are deferred, so load first (`ToolSearch` `select:mcp__codebase-memory-mcp__<tool>`). `Transport closed` / `MCP error -32000` → same tool via `~/.local/bin/codebase-memory-mcp cli <tool>` (flags = schema args in kebab-case) in `ctx_execute(shell)`, or fall back to text search.
 - **Text search**: in a git repo `git grep -n` (no zsh glob, passes the `| head` ban); else `Grep`/`Glob` when listed, else `grep -rn`/`find` inside `ctx_execute(shell)`.
 - **Run/read → context-mode**: `ctx_execute` prints only the answer (`file` for a big file/log); `ctx_batch` for >1 command; `ctx_search` for recall.
-- **Docs/web**: library/API docs → context7 first.
+- **Docs/web**: library/API docs → WebSearch.
 - **Files**: write with `Edit`/`Write`, scratchpad and `/tmp` included. The hook `bash-ban-shell-writes` blocks shell writes in Bash; it cannot see `ctx_execute`, so code run there never writes a file either. A file you must read whole (to rewrite or humanize it) → `Read` with `offset`/`limit`: context-mode folds a bare Read over 2 KB into a search pointer. In a REPL script the same cap hits `file().text()`, `edit()` and `$` output: read with `file().slice()` or `sed -n`, edit with `tools.Edit`, and send long `$` output to a scratchpad log (`cmd > log 2>&1`) to read with `file().slice()`; `| head` and `| tail` are blocked.
 - **Shell is zsh**: `$cmd` holding "pnpm ci" does not word-split (exit 127); call each command directly or use the repo script.
 - **RTK**: Bash runs as `rtk <cmd>`; unfiltered → `rtk proxy <cmd>`. Details: `~/.claude/RTK.md`.
