@@ -8,8 +8,8 @@ SETTINGS = {"hooks": {"SessionStart": [{"hooks": [
     {"type": "command", "command": "~/.claude/hooks/skill-model-invocable unlocked"}]}]}}
 
 
-def fixture(files=None, settings=SETTINGS, skills=None):
-    """files: {repo-relative path: text}. skills: {name: SKILL.md text} under the fake HOME."""
+def fixture(files=None, settings=SETTINGS, skills=None, home_files=None):
+    """files: {repo-relative path: text}. skills: {name: SKILL.md text} under the fake HOME. home_files: {HOME-relative path: text}."""
     root = tempfile.mkdtemp()
     repo, home = os.path.join(root, "repo"), os.path.join(root, "home")
     base = {
@@ -35,6 +35,11 @@ def fixture(files=None, settings=SETTINGS, skills=None):
         os.makedirs(d)
         with open(os.path.join(d, "SKILL.md"), "w") as f:
             f.write(text)
+    for rel, text in (home_files or {}).items():
+        p = os.path.join(home, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w") as f:
+            f.write(text.replace("{HOME}", home))
     return repo, home
 
 
@@ -94,6 +99,39 @@ case("windows settings call a file the repo lacks", 1, "hooks/gone.ps1",
 case("windows settings may call a shared python hook", 0, "check: ok",
      files={"windows/settings.example.json": json.dumps({"hooks": {"Stop": [{"hooks": [
          {"type": "command", "command": "python C:/Users/YOU/.claude/hooks/good-hook"}]}]}})})
+
+def plugins(installed, cache):
+    """installed: {plugin: version} in Claude Code's install record. cache: {"plugin/version/path": text}."""
+    record = {"version": 2, "plugins": {p + "@mk": [{"scope": "user", "version": v,
+              "installPath": "{HOME}/.claude/plugins/cache/mk/%s/%s" % (p, v)}] for p, v in installed.items()}}
+    files = {".claude/plugins/installed_plugins.json": json.dumps(record)}
+    files.update({".claude/plugins/cache/mk/" + k: t for k, t in cache.items()})
+    return files
+
+
+HF = "---\nname: hf\n---\n"
+HF_PLUGIN = plugins({"hf": "1.0"}, {"hf/1.0/skills/hf/SKILL.md": HF})
+ROUTE = "Read `~/.claude/CODING_STANDARDS.md` and `agent-tuning.md`.\n| Task | Flow | Lead skill | Done |\n|---|---|---|---|\n"
+case("lead skill that is not installed", 1, "ghost",
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `ghost` | done |\n"})
+case("lead skills found as plugin skill, user skill, agent and built-in pass", 0, "check: ok",
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hf:hf` · `anim` · `scout` agent · `update-config` | done |\n",
+            "claude/agents/scout.md": "---\nname: scout\n---\n"},
+     home_files=HF_PLUGIN)
+case("misnamed skill of an installed plugin outside the Route table", 1, "hf:gone",
+     files={"claude/CLAUDE.md": ROUTE + "Then call `hf:gone`; cite `file:line`.\n"}, home_files=HF_PLUGIN)
+case("plugin that is one skill at its root passes as a lead skill", 0, "check: ok",
+     files={"claude/CLAUDE.md": ROUTE + "| Doc | Deliverable flow | `hz` | done |\n"},
+     home_files=plugins({"hz": "4.0.0"}, {"hz/4.0.0/SKILL.md": "---\nname: hz\n---\n"}))
+case("a skill only an older cached version has does not count", 1, "hf:old",
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hf:old` | done |\n"},
+     home_files=plugins({"hf": "2.0"}, {"hf/1.0/skills/old/SKILL.md": HF, "hf/2.0/skills/hf/SKILL.md": HF}))
+case("a cached plugin that is not installed does not count", 1, "hf:hf",
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hf:hf` | done |\n"},
+     home_files=plugins({}, {"hf/1.0/skills/hf/SKILL.md": HF}))
+case("model told to call a user-only plugin skill", 1, "/hf:hf",
+     files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hf:hf` | done |\n"},
+     home_files=plugins({"hf": "1.0"}, {"hf/1.0/skills/hf/SKILL.md": "---\nname: hf\ndisable-model-invocation: true\n---\n"}))
 
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)
