@@ -73,10 +73,14 @@ The files above call out to other projects. None of them are copied here.
 | `humanizer` plugin | `settings.example.json`, writing flow | [blader/humanizer](https://github.com/blader/humanizer) |
 | `context-mode` plugin | `settings.example.json`, tool rules | [mksglu/context-mode](https://github.com/mksglu/context-mode) |
 | `context7` plugin | `settings.example.json` (off by default; optional docs lookups) | `claude-plugins-official` marketplace |
+| `hyperframes` plugin | Video row in `CLAUDE.md` (off by default) | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) |
+| `lemo-opuscar` plugin | Video row in `CLAUDE.md` (off by default) | [lemomo-ai/lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) |
 
 `codebase-memory-mcp` re-indexes git repos when they change. A folder with no git stays at its first index unless you run `index_repository` again or set `config set watch_non_git true`. Each linked git worktree becomes its own permanent index; `config set ignore_worktrees true` skips them.
 
 `settings.example.json` lists the marketplaces and enables the plugins. If one is missing after you merge it, add it with `/plugin marketplace add <owner/repo>` and then `/plugin install`.
+
+The two video plugins are off in user settings. Their skill descriptions take about 1.4k tokens in every session (`claude plugin details <id>`), and only video work needs them. Turn them on in a video project with `claude plugin enable hyperframes@hyperframes --scope project` (or `lemo-opuscar@lemolab`). The command writes the project's `.claude/settings.json`, which overrides the user setting; `/reload-plugins` loads the skills into a session that is already open. `remotion-best-practices` is a plain skill, not a plugin, so user settings hide it with `skillOverrides`; a Remotion project turns it back on with `"skillOverrides": {"remotion-best-practices": "on"}` in its `.claude/settings.json`.
 
 Skills named in `CLAUDE.md`:
 

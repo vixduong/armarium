@@ -34,7 +34,8 @@
     "triage": "off",
     "setup-matt-pocock-skills": "off",
     "codebase-memory": "off",
-    "implement-spec": "off"
+    "implement-spec": "off",
+    "remotion-best-practices": "off"
   },
   "hooks": {
     "PreToolUse": [
@@ -134,7 +135,9 @@
     "ponytail@ponytail": true,
     "context7@claude-plugins-official": false,
     "humanizer@humanizer": true,
-    "context-mode@context-mode": true
+    "context-mode@context-mode": true,
+    "hyperframes@hyperframes": false,
+    "lemo-opuscar@lemolab": false
   },
   "extraKnownMarketplaces": {
     "ponytail": {
@@ -155,6 +158,20 @@
       "source": {
         "source": "github",
         "repo": "mksglu/context-mode"
+      },
+      "autoUpdate": false
+    },
+    "hyperframes": {
+      "source": {
+        "source": "github",
+        "repo": "heygen-com/hyperframes"
+      },
+      "autoUpdate": false
+    },
+    "lemolab": {
+      "source": {
+        "source": "github",
+        "repo": "lemomo-ai/lemo-opuscar"
       },
       "autoUpdate": false
     }
