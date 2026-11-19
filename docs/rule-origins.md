@@ -108,6 +108,8 @@ A self-audit of a session with seven deliverables ($21.22). Report: `/Users/Shar
 | Skill evidence follows the Flow line (`CLAUDE.md` Exit, `hooks/flow-skill-check`) | The post's Exit marked `humanizer` ✓ by citing a call made an hour earlier for another deliverable; the hook accepted any call in the session | transcript lines 459 (call) and 1181 (the post's Flow line, no call after it) | A call counts only after the last Flow line naming it; a `/skill` command counts only for the task it started; only this turn's Flow lines are checked |
 | One owner for Video lead skills (`CLAUDE.md` Route, `rules/video.md`) | Three places listed different leads: `ui-ux-pro-max` ran after the first code write, `lean-build` and `tdd` never ran and no Exit showed them as ✗ | lines 1342, 1463, 2084, 2028 | The Video row owns the list; `video.md` points to it |
 | The Stop hook reads the final reply (`hooks/flow-skill-check`) | A reply with the right ✗ line was blocked in the same second it was written | lines 612 to 615 | The hook also reads `last_assistant_message` from its input |
+| A turn with a Flow line ends on an Exit list (`hooks/flow-skill-check`, `CLAUDE.md` Exit) | Three final replies in session `0fb097b2` listed no Done-when item, so a skipped intake note went unseen; the hook passed all three because the named skills had been called. Session `f3410d1d` also had no ✓ or ✗ in any reply | lines 1287, 1930, 2275; `~/claude-evals/session-0fb097b2/report.md` F2 | The hook blocks once when this turn's final reply has no ✓ or ✗ line outside a Flow line |
+| The Stop hook decodes its input as UTF-8 (`hooks/flow-skill-check`) | On Windows, Python read stdin as cp1252, so a ✓ or ✗ in `last_assistant_message` never matched: the new Exit check blocked a reply that had both, and a ✗ sent on stdin had never cleared a skill. The self-test sent `\u2713` escapes, so it could not see this | the Stop block on the reply that shipped the Exit check | The hook reads `sys.stdin.buffer` as UTF-8; the self-test sends raw UTF-8 |
 | Long `$` output in REPL scripts (`CLAUDE.md` Tools) | context-mode folded `$` output over 2 KB four times, and `| head` was blocked twice | the report's finding 5 | Send it to a scratchpad log and read with `file().slice()` |
 
 ## Changed after the 68085871 session audit
@@ -141,6 +143,15 @@ A `/doctor` run over the 50 newest sessions (2026-11-10 to 2026-11-18, every pro
 | Rule (where) | What happened | Evidence | Change |
 |---|---|---|---|
 | Docs/web: library/API docs → context7 first (`CLAUDE.md` Tools) | The line pointed at a plugin that no session used; the scan found the plugin's tools called 0 times, against 285 for `context-mode` and 63 for `codebase-memory-mcp`. It had 2 uses since install, the last on 2026-11-05 | `transcripts.txt` MCP counts; `pluginUsage` in `~/.claude.json` | Plugin set to `false` in both `settings.example.json` files and marked off by default in the README; the line now says WebSearch |
+
+## Changed after the b672aeb0 session audit
+
+A wayfinder + bug-fix session on 2026-11-19 in a private Spring workspace ($11.18, opus main, 3 `reviewer` calls). Local data: `claude-evals/session-b672aeb0/`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Read-only agents cannot write from Bash (`hooks/bash-ban-shell-writes`) | `reviewer` has no Write/Edit, but its Bash is unrestricted: one spec review ran 20 redirects into 28+ files under the project's `.scratch/`. Its `.md` says "never run anything that writes"; the hook allowed log redirects for every caller | main transcript line 1446 (the prompt that asked for it); only that reviewer of 3 got the instruction and only it wrote | For `agent_type` `reviewer`/`oracle` the hook blocks file redirects (`>`, `2>`, `&>`), `mkdir/rm/mv/cp/touch`, git write subcommands, and ignores the unlock file. Live probe from a `reviewer`: redirect blocked, `\| sed -n` ran |
+| Read-only agents read long output in slices (`CLAUDE.md` Tools, Files) | The parent copied "send long output to a scratchpad log" into the reviewer's prompt, overriding `reviewer.md`; it gave the same line to both research agents | same transcript, lines 405-424 and 1446 | One sentence: a `reviewer`/`oracle` prompt asks for `\| sed -n` or `git grep -n` instead |
 
 ## Kept, with evidence
 
