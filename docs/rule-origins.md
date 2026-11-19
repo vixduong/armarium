@@ -144,6 +144,15 @@ A `/doctor` run over the 50 newest sessions (2026-11-10 to 2026-11-18, every pro
 |---|---|---|---|
 | Docs/web: library/API docs → context7 first (`CLAUDE.md` Tools) | The line pointed at a plugin that no session used; the scan found the plugin's tools called 0 times, against 285 for `context-mode` and 63 for `codebase-memory-mcp`. It had 2 uses since install, the last on 2026-11-05 | `transcripts.txt` MCP counts; `pluginUsage` in `~/.claude.json` | Plugin set to `false` in both `settings.example.json` files and marked off by default in the README; the line now says WebSearch |
 
+## Changed after the b672aeb0 session audit
+
+A wayfinder + bug-fix session on 2026-11-19 in a private Spring workspace ($11.18, opus main, 3 `reviewer` calls). Local data: `claude-evals/session-b672aeb0/`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Read-only agents cannot write from Bash (`hooks/bash-ban-shell-writes`) | `reviewer` has no Write/Edit, but its Bash is unrestricted: one spec review ran 20 redirects into 28+ files under the project's `.scratch/`. Its `.md` says "never run anything that writes"; the hook allowed log redirects for every caller | main transcript line 1446 (the prompt that asked for it); only that reviewer of 3 got the instruction and only it wrote | For `agent_type` `reviewer`/`oracle` the hook blocks file redirects (`>`, `2>`, `&>`), `mkdir/rm/mv/cp/touch`, git write subcommands, and ignores the unlock file. Live probe from a `reviewer`: redirect blocked, `\| sed -n` ran |
+| Read-only agents read long output in slices (`CLAUDE.md` Tools, Files) | The parent copied "send long output to a scratchpad log" into the reviewer's prompt, overriding `reviewer.md`; it gave the same line to both research agents | same transcript, lines 405-424 and 1446 | One sentence: a `reviewer`/`oracle` prompt asks for `\| sed -n` or `git grep -n` instead |
+
 ## Kept, with evidence
 
 | Rule | Evidence | Note |
