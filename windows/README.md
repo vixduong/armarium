@@ -4,9 +4,10 @@
 
 | Here | Port of (in `claude/`) |
 |---|---|
-| `statusline.ps1` | `statusline-command.sh` |
-| `hooks/bash-ban-raw-tools.ps1` | `hooks/bash-ban-raw-tools`; the matcher is `Bash\|PowerShell`, so it also bans `Get-Content`, `Select-String`, `findstr` |
-| `hooks/run-cli-hook.ps1` | `hooks/run-cli-hook` |
+| `statusline.py` | `statusline-command.sh` |
+| `hooks/bash-ban-raw-tools.py` | `hooks/bash-ban-raw-tools`; the matcher is `Bash\|PowerShell`, so it also bans `Get-Content`, `Select-String`, `findstr` |
+| `hooks/run_cli_hook.py` | `hooks/run-cli-hook`, for the per-call `rtk hook claude` |
+| `hooks/run-cli-hook.ps1` | `hooks/run-cli-hook`, for the `cbm-*.ps1` hooks |
 | `hooks/cbm-session-reminder.ps1`, `hooks/cbm-subagent-reminder.ps1` | the two `cbm-*-reminder` hooks |
 | `hooks/memory-repo-symlink.ps1` | `hooks/memory-repo-symlink` (a junction, so no admin rights are needed) |
 | `hooks/codemode-ponytail-band.ps1` | `hooks/codemode-ponytail-band` |
@@ -26,9 +27,9 @@ Then merge `settings.example.json` into `~\.claude\settings.json` by hand and re
 
 ## Requirements
 
-`python` on PATH (the Python hooks), Git for Windows (the Bash tool), `rtk` (`winget install rtk-ai.rtk`), and optionally `codebase-memory-mcp`. `run-cli-hook.ps1` also looks in `~\.local\bin`, `~\.cargo\bin`, `%APPDATA%\npm`, scoop shims and the WinGet links folder. Self-tests: `python -I ~\.claude\hooks\test_agent_no_downgrade.py`, `test_bash_ban_shell_writes.py`, `test_codemode_ponytail_band.py`, `test_flow_skill_check.py`, `test_skill_model_invocable.py` and `test_armarium_links.py`. `armarium-links` stays silent after `install.ps1`, which copies rather than links. `test_armarium_links.py` creates symlinks, which Windows allows only with Developer Mode on or from an elevated shell.
+`python` on PATH (the Python hooks), Git for Windows (the Bash tool), `rtk` (`winget install rtk-ai.rtk`), and optionally `codebase-memory-mcp`. `run_cli_hook.py` and `run-cli-hook.ps1` also look in `~\.local\bin`, `~\.cargo\bin`, `%APPDATA%\npm`, scoop shims and the WinGet links folder. Self-tests: `python -I ~\.claude\hooks\test_agent_no_downgrade.py`, `test_bash_ban_shell_writes.py`, `test_codemode_ponytail_band.py`, `test_flow_skill_check.py`, `test_skill_model_invocable.py`, `test_armarium_links.py`, `test_bash_ban_raw_tools.py` and `test_statusline.py`. `armarium-links` stays silent after `install.ps1`, which copies rather than links. `test_armarium_links.py` creates symlinks, which Windows allows only with Developer Mode on or from an elevated shell.
 
 ## Known gaps
 
-- `bash-ban-shell-writes` keys its 10-minute unlock file on the parent PID under `/tmp`, while `bash-ban-raw-tools.ps1` uses `%TEMP%\bash-raw-unlock-<pid>`. The two unlocks are separate on Windows.
-- Each `.ps1` hook starts a PowerShell process (about 0.2 to 0.4 s per call), where the macOS hooks start bash.
+- `bash-ban-shell-writes` keys its 10-minute unlock file on the parent PID under `/tmp`, while `bash-ban-raw-tools.py` uses `%TEMP%\bash-raw-unlock-<pid>`. The two unlocks are separate on Windows. Both take the PID from `os.getppid()`, which is the `python` launcher's when `python` is a launcher (uv, py).
+- Each `.ps1` hook starts a PowerShell process (0.5 to 0.9 s measured), where the macOS hooks start bash. The two hooks that run on every Bash call are Python for that reason (about 0.1 s); the `.ps1` hooks left run at session or subagent start.

@@ -21,7 +21,8 @@ def rel(p):
 
 # Self-tests
 tests = sorted(glob.glob(os.path.join(CLAUDE, "hooks", "test_*.py")) + glob.glob(os.path.join(REPO, "bin", "test_*.py"))
-               + glob.glob(os.path.join(CLAUDE, "skills", "*", "scripts", "test_*.py")))
+               + glob.glob(os.path.join(CLAUDE, "skills", "*", "scripts", "test_*.py"))
+               + glob.glob(os.path.join(REPO, "windows", "hooks", "test_*.py")))
 for t in tests:
     p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True)
     if p.returncode:

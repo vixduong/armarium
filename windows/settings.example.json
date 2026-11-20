@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/bash-ban-raw-tools.ps1",
+            "command": "python C:/Users/YOU/.claude/hooks/bash-ban-raw-tools.py",
             "timeout": 15
           },
           {
@@ -64,7 +64,7 @@
           },
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/run-cli-hook.ps1 rtk hook claude",
+            "command": "python C:/Users/YOU/.claude/hooks/run_cli_hook.py rtk hook claude",
             "timeout": 15
           }
         ]
@@ -129,7 +129,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/statusline.ps1"
+    "command": "python C:/Users/YOU/.claude/statusline.py"
   },
   "enabledPlugins": {
     "ponytail@ponytail": true,

@@ -17,7 +17,7 @@ check("settings parses", True)
 check("deny Read(**/.env)", "Read(**/.env)" in s.get("permissions", {}).get("deny", []))
 check("defaultMode kept", s.get("permissions", {}).get("defaultMode") == "auto")
 check("worktree.baseRef is fresh", s.get("worktree", {}).get("baseRef") == "fresh")
-check("statusLine bypasses execution policy", "-ExecutionPolicy Bypass" in s.get("statusLine", {}).get("command", ""))
+check("statusLine runs statusline.py", s.get("statusLine", {}).get("command", "").endswith("/.claude/statusline.py"))
 start = [h["command"] for g in s.get("hooks", {}).get("SessionStart", []) for h in g["hooks"]]
 for want in ("hooks/armarium-links", "hooks/skill-model-invocable review-animations",  # new
              "hooks/memory-repo-symlink.ps1", "hooks/cbm-session-reminder.ps1", "hooks/codemode-ponytail-band.ps1"):  # kept
