@@ -3,6 +3,8 @@
 - JSON: both settings.example.json files parse.
 - Settings: every ~/.claude/... path a setting calls exists in claude/; hooks are executable.
 - Pointers: every `~/.claude/<file>` in claude/**/*.md exists in claude/ or ~/.claude; every bare `<name>.md` exists in claude/.
+- Names: every Route lead-skill name, and every `plugin:skill` of an installed plugin, is an installed skill, an agent or built in;
+  a plugin the settings declare but this machine lacks is skipped.
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
   unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
 Self-test: python3 -I bin/test_check.py"""
@@ -87,20 +89,79 @@ for md in glob.glob(os.path.join(CLAUDE, "**", "*.md"), recursive=True):
 # Skills the model is told to call
 FRONT = re.compile(r"---\r?\n.*?\r?\n---\r?\n", re.S)  # same frontmatter rule as hooks/skill-model-invocable
 FLAG = re.compile(r"^disable-model-invocation:[ \t]*true[ \t]*\r?$", re.M)
+BUILTIN = {"security-review", "update-config", "artifact-design", "dataviz", "claude-api", "claude-code-guide"}  # ship inside Claude Code or the desktop app
+
+
+def installed_plugins():
+    """plugin name -> install folder, from Claude Code's install record (older cached versions do not count)."""
+    try:
+        with open(os.path.join(HOME_DOT, "plugins", "installed_plugins.json"), encoding="utf-8") as fh:
+            record = json.load(fh).get("plugins", {})
+    except (OSError, ValueError):
+        return {}
+    return {key.split("@")[0]: entries[-1]["installPath"] for key, entries in record.items() if entries}
+
+
+PLUGINS = installed_plugins()
+
+
+def find_skill(name):
+    """SKILL.md for `name` or `plugin:name`: user skills, this repo's skills, then installed plugins."""
+    plugin, _, skill = name.rpartition(":")
+    paths = [] if plugin else [os.path.join(HOME_DOT, "skills", skill, "SKILL.md"), os.path.join(CLAUDE, "skills", skill, "SKILL.md")]
+    roots = [PLUGINS[plugin]] if plugin in PLUGINS else [] if plugin else list(PLUGINS.values())
+    paths += [os.path.join(root, "skills", skill, "SKILL.md") for root in roots]
+    if plugin in ("", skill) and skill in PLUGINS:  # a plugin that is itself one skill keeps SKILL.md at its root
+        paths.append(os.path.join(PLUGINS[skill], "SKILL.md"))
+    return next((p for p in paths if os.path.isfile(p)), None)
+
+
+def is_plugin(prefix):
+    return prefix in PLUGINS
+
+
+def is_agent(name):
+    plugin, _, agent = name.rpartition(":")
+    dirs = [PLUGINS[plugin]] if plugin in PLUGINS else [] if plugin else [CLAUDE, HOME_DOT]
+    return any(os.path.isfile(os.path.join(d, "agents", agent + ".md")) for d in dirs)
+
+
+def owner(path):
+    """The installed plugin a SKILL.md belongs to, or None."""
+    return next((p for p, root in PLUGINS.items() if path.startswith(os.path.join(root, ""))), None)
+
+
+# plugins the settings enable or disable: on a machine that lacks one, its names are skipped, not failed
+DECLARED = {key.split("@")[0] for data in settings.values() for key in data.get("enabledPlugins", {})}
+
+
 for md in [os.path.join(CLAUDE, "CLAUDE.md")] + glob.glob(os.path.join(CLAUDE, "rules", "*.md")):
     if not os.path.exists(md):
         continue
     with open(md, encoding="utf-8") as fh:
         text = fh.read()
+    lead = set()  # names in the Route table's lead-skill column must resolve; elsewhere only names under an installed plugin
+    if md.endswith("CLAUDE.md"):
+        for line in text.splitlines():
+            if line.startswith("|") and line.count("|") >= 5:
+                lead.update(re.findall(r"`([\w:.-]+)`", line.split("|")[3]))
     for name in sorted(set(re.findall(r"`([\w:.-]+)`", text))):
-        skill = os.path.join(HOME_DOT, "skills", name.split(":")[-1], "SKILL.md")
-        if name in unlocked or not os.path.isfile(skill):
+        skill = find_skill(name)
+        if skill is None:
+            prefix = name.rpartition(":")[0] or name
+            if prefix in DECLARED and prefix not in PLUGINS:
+                continue
+            if (name in lead or is_plugin(name.rpartition(":")[0])) and name not in BUILTIN and not is_agent(name):
+                problems.append("%s names `%s`, which no installed skill or agent matches" % (rel(md), name))
+            continue
+        if name in unlocked:
             continue
         with open(skill, encoding="utf-8", errors="replace") as fh:
             front = FRONT.match(fh.read())
             if front and FLAG.search(front.group(0)):
+                full = name if ":" in name or not owner(skill) else "%s:%s" % (owner(skill), name)
                 problems.append("%s tells the model to call `%s`, which is user-only: write `/%s`, or unlock it with skill-model-invocable"
-                                % (rel(md), name, name))
+                                % (rel(md), name, full))
 
 for p in problems:
     print("FAIL " + p)
