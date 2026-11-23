@@ -1,7 +1,8 @@
 # SessionStart context adapter (port of hooks/cbm-session-reminder).
 # Fail-open: it never blocks or logs hook/prompt content.
 # `hook-augment` costs ~300 ms per session start, so the output is cached per cwd;
-# the cache stays valid until an index file (*.db) changes.
+# the cache stays valid until an index file (*.db) changes. Only graph context (additionalContext) is cached:
+# a notice such as "no CBM daemon" describes one moment, and a cached copy replayed it to later sessions.
 $ErrorActionPreference = 'SilentlyContinue'
 $bin = & "$PSScriptRoot\run-cli-hook.ps1" --which codebase-memory-mcp
 if (-not $bin) { exit 0 }
@@ -19,7 +20,7 @@ if ($cwd) {
   $f = Join-Path $d "hook-cache\$($h.Substring(0, 16)).json"
 }
 $newest = Get-ChildItem $d -Filter *.db | Where-Object Name -ne 'activity.db' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if ($f -and (Test-Path -LiteralPath $f) -and (Get-Item -LiteralPath $f).Length -gt 0) {
+if ($f -and (Test-Path -LiteralPath $f) -and ([IO.File]::ReadAllText($f)).Contains('additionalContext')) {
   $t = (Get-Item -LiteralPath $f).LastWriteTime
   if ($t -gt (Get-Item $d).LastWriteTime -and (-not $newest -or $t -gt $newest.LastWriteTime)) {
     [Console]::Out.Write([IO.File]::ReadAllText($f)); exit 0
@@ -27,7 +28,7 @@ if ($f -and (Test-Path -LiteralPath $f) -and (Get-Item -LiteralPath $f).Length -
 }
 $out = (($in | & $bin hook-augment 2>$null) -join "`n")
 [Console]::Out.Write($out)
-if ($f -and $out) {
+if ($f -and $out.Contains('additionalContext')) {
   New-Item -ItemType Directory -Force (Split-Path $f) | Out-Null
   [IO.File]::WriteAllText($f, $out, $utf8)
 }

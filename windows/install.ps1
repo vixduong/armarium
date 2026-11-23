@@ -8,7 +8,7 @@ $bak  = Join-Path $dest ("backups\armarium-" + (Get-Date -Format 'yyyyMMdd-HHmms
 
 # claude/ items that need bash or macOS, or that Windows replaces from windows/
 $skip = 'skills', 'settings.example.json', 'statusline-command.sh',
-        'bash-ban-raw-tools', 'run-cli-hook', 'cbm-session-reminder', 'cbm-subagent-reminder',
+        'bash-ban-raw-tools', 'run-cli-hook', 'cbm-session-reminder',
         'memory-repo-symlink', 'codemode-ponytail-band'
 # CLAUDE.md lines that assume macOS/zsh; each must match once, or the repo text has drifted
 $patch = @(

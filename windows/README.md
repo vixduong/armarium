@@ -8,7 +8,7 @@
 | `hooks/bash-ban-raw-tools.py` | `hooks/bash-ban-raw-tools`; the matcher is `Bash\|PowerShell`, so it also bans `Get-Content`, `Select-String`, `findstr` |
 | `hooks/run_cli_hook.py` | `hooks/run-cli-hook`, for the per-call `rtk hook claude` |
 | `hooks/run-cli-hook.ps1` | `hooks/run-cli-hook`, for the `cbm-*.ps1` hooks |
-| `hooks/cbm-session-reminder.ps1`, `hooks/cbm-subagent-reminder.ps1` | the two `cbm-*-reminder` hooks |
+| `hooks/cbm-session-reminder.ps1` | `hooks/cbm-session-reminder` |
 | `hooks/memory-repo-symlink.ps1` | `hooks/memory-repo-symlink` (a junction, so no admin rights are needed) |
 | `hooks/codemode-ponytail-band.ps1` | `hooks/codemode-ponytail-band` |
 

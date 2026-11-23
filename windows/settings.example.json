@@ -81,17 +81,6 @@
         ]
       }
     ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/cbm-subagent-reminder.ps1",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [

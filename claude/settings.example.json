@@ -81,17 +81,6 @@
         ]
       }
     ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/cbm-subagent-reminder",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [
