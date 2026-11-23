@@ -14,7 +14,7 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
    ```bash
    python3 -I ~/.claude/skills/claude-md-audit/scripts/session_audit.py <session-id>
    ```
-   It prints cost per agent in USD, the `Flow:` lines, Skill and Agent calls, hook blocks, folds and tool errors. Done when the table's total and the commit range of the work are written down.
+   It prints per agent: cost in USD and its mix, first-request and peak context, REPL, Poll-only, context-mode and CBM calls, folds received. For the main thread: the `Flow:` lines, Skill and Agent calls, instruction files loaded, hook messages, blocks and tool errors. Done when the table's total and the commit range of the work are written down.
 
 3. **Read the config as the session saw it**: `~/.claude/CLAUDE.md`, the project `CLAUDE.md`, every rule file, agent `.md` and skill `SKILL.md` the session loaded, `~/.claude/agent-tuning.md`, and the hooks block of `~/.claude/settings.json`. Edited since? Use `git log` in `~/projects/armarium` to get the version the session ran under.
 
@@ -48,6 +48,11 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
 - **Models**: every per-call `model` against `agent-tuning.md`. Price each escalation in USD and set it against what it found (P0/P1 count).
 - **Conflicts**: a skill step against a CLAUDE.md step (e.g. `/implement` → `code-review` vs step 8). Note which one the agent followed.
 - **Cost sinks**: the three biggest agents by USD. Main thread context per request; recon or fix rounds the main did itself.
+- **Context load**: each agent's `ctx0` against sessions of the same mode (Code Mode main ≈37k tokens, classic ≈75k, measured 2026-11-23). In `loaded`, a CLAUDE.md outside `~/.claude` and the project (`~/.nvm`, a plugin cache) → `claudeMdExcludes`. A `peak` near `autoCompactWindow` means the work outgrew one session.
+- **Cost mix**: cache write and cache read are the price of context. A cache-write share above output's points at cold starts: subagents spawned, a resume, an expired cache TTL. Name which.
+- **Plugins, main vs subagent**: per agent, context-mode and CBM calls against `folds`. An agent with folds and no `ctx_search` ignored them: its prompt or the `## Tools` route it follows lacks the step. A hook message repeated across sessions (e.g. "no CBM daemon") is a stale hook or cache, layer hook.
+- **Code Mode**: Poll-only requests each re-read the whole context to wait; price them. Subagents without `repl` calls follow the non-REPL route in `## Tools`: check it covered them.
+- **Memory**: memory files in `loaded` carry the frontmatter CLAUDE.md `## Context` asks for. A decision the session made that no memory file or ADR holds is a missed save; a memory restating what the repo holds is load to cut.
 - **Friction**: each hook block, fold, denial or tool error, traced to its layer. A block repeated by the same agent means that agent's prompt lacks the rule. The script's event counts are upper bounds: Code Mode repeats a result inside its REPL event, so count distinct commands before quoting a number.
 - **Verification**: the main re-ran the gate itself rather than trusting a worker's report.
-- **Never triggered** (two or more sessions): rules, agents or hooks with zero hits. These are candidates for retro's no-ops category.
+- **Never triggered** (two or more sessions): rules, agents, hooks or plugin tools with zero hits. These are candidates for retro's no-ops category.

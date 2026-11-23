@@ -4,8 +4,10 @@
 Usage: python3 -I session_audit.py <session-id | path/to/<id>.jsonl> [--cwd-slug SLUG] [--json]
 
 Reads <id>.jsonl plus <id>/subagents/*.jsonl (+ .meta.json). Prints:
-  per agent: type, model, requests, tokens, cost in USD
-  main thread: Flow lines, Skill calls, Agent calls (type, model override, description)
+  per agent: type, model, requests, tokens, cost in USD and its mix, first-request and peak
+    context (tokens sent), REPL calls, Poll-only requests, context-mode / CBM calls, folds received
+  main thread: Flow lines, Skill calls, Agent calls (type, model override, description),
+    instruction files loaded (CLAUDE.md, memory) with size, hook system messages
   hook blocks, permission denials, context-mode folds, tool errors, resumes
 Notes it handles: usage deduped by requestId; '<synthetic>' entries skipped; Code Mode nested
 calls (ids starting 'repl_') counted once; `claude -r` appends to the same .jsonl (a resume
@@ -25,6 +27,8 @@ PATTERNS = {
     'hook_fail': r'the hook failed|the hook did not finish',
     'fold': r'ctx_search\(',
 }
+FOLD = re.compile(r'searches the whole output|ctx_search\(\{queries')
+PLUGINS = {'mcp__plugin_context-mode_': 'context-mode', 'mcp__codebase-memory-mcp__': 'cbm'}
 
 
 def find(arg, slug):
@@ -51,21 +55,36 @@ def short(model):
 
 
 def usage(path):
-    req, models = {}, Counter()
+    req, models, tools, plug, seen = {}, Counter(), {}, Counter(), set()
+    folds = repl = 0
     first = last = None
     for d in lines(path):
         ts = d.get('timestamp')
         if ts:
             first = first or ts
             last = ts
-        if d.get('type') != 'assistant' or d['message'].get('model') == '<synthetic>':
+        msg = d.get('message') or {}
+        if d.get('type') == 'user' and isinstance(msg.get('content'), list):
+            folds += sum(1 for x in msg['content'] if x.get('type') == 'tool_result'
+                         and FOLD.search(json.dumps(x.get('content'), ensure_ascii=False)))
+        if d.get('type') != 'assistant' or msg.get('model') == '<synthetic>':
             continue
-        m = short(d['message'].get('model'))
+        m = short(msg.get('model'))
         models[m] += 1
-        req[d.get('requestId') or d.get('uuid')] = (m, d['message'].get('usage') or {})
-    tot = Counter()
-    cost = 0.0
+        k = d.get('requestId') or d.get('uuid')
+        req[k] = (m, msg.get('usage') or {})
+        for x in msg.get('content') or []:
+            if x.get('type') != 'tool_use' or x['id'] in seen:
+                continue
+            seen.add(x['id'])
+            tools.setdefault(k, set()).add(x['name'])
+            repl += x['name'] == 'REPL'
+            for pre, label in PLUGINS.items():
+                plug[label] += x['name'].startswith(pre)
+    tot, parts = Counter(), Counter()
+    sizes = []
     for m, u in req.values():
+        sizes.append(sum(u.get(k, 0) or 0 for k in ('input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')))
         p = PRICES.get(m)
         cw = u.get('cache_creation') or {}
         w1h = cw.get('ephemeral_1h_input_tokens', 0) or 0
@@ -73,20 +92,33 @@ def usage(path):
         for k in ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'):
             tot[k] += u.get(k, 0) or 0
         if p:
-            cost += ((u.get('input_tokens', 0) or 0) * p[0] + (u.get('output_tokens', 0) or 0) * p[1]
-                     + (u.get('cache_read_input_tokens', 0) or 0) * p[2] + w5m * p[0] * 1.25 + w1h * p[0] * 2) / 1e6
-    return {'requests': len(req), 'models': dict(models), 'tokens': dict(tot), 'usd': round(cost, 2),
+            parts['input'] += (u.get('input_tokens', 0) or 0) * p[0] / 1e6
+            parts['output'] += (u.get('output_tokens', 0) or 0) * p[1] / 1e6
+            parts['cache_read'] += (u.get('cache_read_input_tokens', 0) or 0) * p[2] / 1e6
+            parts['cache_write'] += (w5m * 1.25 + w1h * 2) * p[0] / 1e6
+    return {'requests': len(req), 'models': dict(models), 'tokens': dict(tot), 'usd': round(sum(parts.values()), 2),
+            'usd_parts': {k: round(v, 4) for k, v in parts.items()},
+            'ctx0': sizes[0] if sizes else 0, 'peak': max(sizes, default=0), 'repl': repl, 'folds': folds,
+            'poll_only': sum(1 for s in tools.values() if s == {'Poll'}), 'plugin_calls': {k: v for k, v in plug.items() if v},
             'span': f'{(first or "")[11:16]}-{(last or "")[11:16]}'}
 
 
 def main_thread(path):
-    out = {'flow': [], 'skills': [], 'agents': [], 'events': Counter(), 'errors': [], 'resumes': 0, 'tools': Counter()}
-    seen_tool, resumes = set(), set()
+    out = {'flow': [], 'skills': [], 'agents': [], 'events': Counter(), 'errors': [], 'resumes': 0, 'tools': Counter(),
+           'hook_messages': Counter()}
+    seen_tool, resumes, loaded = set(), set(), {}
     for d in lines(path):
         t = d.get('type')
         att = d.get('attachment') or {}
         if att.get('hookName') == 'SessionStart:resume':
             resumes.add(att.get('toolUseID'))
+        for f in att.get('files') or [] if att.get('type') == 'instructions' else []:
+            loaded[f.get('path')] = (f.get('type'), len(f.get('content') or ''))
+        if att.get('type') == 'nested_memory':
+            c = att.get('content') or {}
+            loaded[att.get('path')] = (c.get('type'), len(c.get('content') or ''))
+        if att.get('type') == 'hook_system_message':
+            out['hook_messages'][str(att.get('content'))[:120]] += 1
         if t == 'assistant':
             for x in d['message'].get('content') or []:
                 if x.get('type') == 'text':
@@ -112,6 +144,7 @@ def main_thread(path):
                 if x.get('is_error'):
                     out['errors'].append(s[:160])
     out['resumes'] = len(resumes)
+    out['loaded'] = [(p, ty, n) for p, (ty, n) in loaded.items()]
     out['skills'] = list(dict.fromkeys(s for s in out['skills'] if s))
     return out
 
@@ -131,13 +164,23 @@ def main():
         return
     print(f'# {os.path.basename(path)}  resumes: {mt["resumes"]}')
     print(f'{"agent":10} {"description":40} {"model":12} {"req":>4} {"cache_read":>10} {"cache_wr":>9} {"out":>7} {"usd":>7}  span')
-    total = 0.0
+    total, parts = 0.0, Counter()
     for a, desc, u in rows:
         tk = u['tokens']
         total += u['usd']
+        parts.update(u['usd_parts'])
         print(f'{a:10} {desc:40} {"/".join(u["models"]):12} {u["requests"]:4} {tk.get("cache_read_input_tokens", 0):10} '
               f'{tk.get("cache_creation_input_tokens", 0):9} {tk.get("output_tokens", 0):7} {u["usd"]:7.2f}  {u["span"]}')
-    print(f'total usd {total:.2f}')
+    print(f'total usd {total:.2f}  mix: ' + ', '.join(f'{k} {v / (total or 1):.0%}' for k, v in parts.most_common()))
+    print(f'\n{"agent":10} {"ctx0_k":>6} {"peak_k":>6} {"repl":>4} {"poll_only":>9} {"ctx_mode":>8} {"cbm":>4} {"folds":>5}')
+    for a, _, u in rows:
+        pc = u['plugin_calls']
+        print(f'{a:10} {u["ctx0"] // 1000:6} {u["peak"] // 1000:6} {u["repl"]:4} {u["poll_only"]:9} '
+              f'{pc.get("context-mode", 0):8} {pc.get("cbm", 0):4} {u["folds"]:5}')
+    print('\nloaded:')
+    for p, ty, n in mt['loaded']:
+        print(f'  {ty or "?":8} {n:7} chars  {p}')
+    print('hook messages:', dict(mt['hook_messages']) or 'none')
     print('flow:', mt['flow'] or 'none')
     print('skills:', mt['skills'])
     print('agent calls:', mt['agents'])
