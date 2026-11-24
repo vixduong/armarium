@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+# Stop gate for Code flow step 8: a turn with a Flow line whose own edits are Big (>200 changed lines or >3 files,
+# markdown and text excluded) needs a `reviewer` agent or `code-review` call after this turn's prompt. Blocks once;
+# stop_hook_active lets the retry through, so the agent runs the review instead of only listing it as ✗.
+# Counts Write/Edit/MultiEdit inputs of the transcript, plus what git sees in cwd: files changed since the turn's
+# prompt (REPL write()/edit(), subagents, Bash), each file counted once at its larger figure.
+# shortcut: git counts a file's whole diff against HEAD and skips deletions, so earlier uncommitted edits to a file
+# touched this turn count too; snapshot numstat at UserPromptSubmit if that over-blocks.
+# Self-test: python3 -I ~/.claude/hooks/test_reviewer_gate.py
+import json, os, re, subprocess, sys
+from datetime import datetime
+
+DOCS = (".md", ".markdown", ".txt", ".rst")
+REVIEW_IN_CODE = re.compile(r"""subagent_type\s*:\s*['"]reviewer['"]|skill\s*:\s*['"](?:[\w-]+:)?code-review['"]""")
+
+def lines(s): return len(str(s or "").splitlines())
+
+def key(p): return os.path.normcase(os.path.realpath(p))  # git and transcript agree (macOS /private/var, Windows slashes)
+
+def git_changes(cwd, since):
+    """{key(path): changed lines} for non-doc files in cwd's work tree modified at or after `since` (epoch s)."""
+    def git(*a): return subprocess.run(["git", "-C", cwd, *a], capture_output=True, timeout=3).stdout.decode("utf-8", "replace")
+    top = git("rev-parse", "--show-toplevel").strip()
+    if not top:
+        return {}
+    numstat = {}
+    for rec in git("diff", "--numstat", "-z", "HEAD").split("\0"):
+        parts = rec.split("\t")
+        if len(parts) == 3 and parts[0].isdigit():
+            numstat[parts[2]] = int(parts[0]) + int(parts[1])
+    out, recs = {}, iter(git("status", "--porcelain", "-z", "--untracked-files=all").split("\0"))
+    for rec in recs:
+        if rec[:1] in ("R", "C"):
+            next(recs, None)  # -z puts a rename's old path in the next record
+        rel = rec[3:]
+        path = os.path.join(top, rel)
+        if (not rel or rel.lower().endswith(DOCS) or os.path.islink(path) or not os.path.isfile(path)
+                or os.path.getmtime(path) < since):
+            continue
+        if rel in numstat:
+            out[key(path)] = numstat[rel]
+        elif rec.startswith("??"):
+            with open(path, "rb") as f:
+                head = f.read(5_000_000)
+            if b"\0" not in head[:8000]:  # binary (screenshots): not code
+                out[key(path)] = head.count(b"\n")
+        if len(out) > 3 or sum(out.values()) > 200:
+            break  # already Big
+    return out
+
+try:
+    data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+    if data.get("stop_hook_active"):
+        sys.exit(0)
+    per_file, flow, reviewed, since = {}, False, False, None
+    with open(data.get("transcript_path") or "", encoding="utf-8") as f:
+        for line in f:
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if r.get("isSidechain"):
+                continue
+            content = (r.get("message") or {}).get("content")
+            if r.get("type") == "user":
+                typed = isinstance(content, str) or (isinstance(content, list) and not any(
+                    isinstance(b, dict) and b.get("type") == "tool_result" for b in content))  # list: text + image
+                if typed and not r.get("isMeta") and (r.get("origin") or {}).get("kind", "human") == "human":
+                    per_file, flow, reviewed = {}, False, False  # a new prompt starts a new turn
+                    try:
+                        since = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00")).timestamp()
+                    except (KeyError, ValueError, AttributeError):
+                        since = None
+                continue
+            if r.get("type") != "assistant" or not isinstance(content, list):
+                continue
+            for b in content:
+                if b.get("type") == "text" and any(ln.lstrip().startswith("Flow:") for ln in b.get("text", "").splitlines()):
+                    flow = True
+                if b.get("type") != "tool_use":
+                    continue
+                name, inp = b.get("name"), b.get("input") or {}
+                path = str(inp.get("file_path", ""))
+                if name in ("Write", "Edit", "MultiEdit") and not path.lower().endswith(DOCS):
+                    n = lines(inp.get("content")) if name == "Write" else sum(
+                        lines(e.get("old_string")) + lines(e.get("new_string")) for e in (inp.get("edits") or [inp]))
+                    path = key(path) if path else path
+                    per_file[path] = per_file.get(path, 0) + n
+                elif name in ("Agent", "Task") and inp.get("subagent_type") == "reviewer":
+                    reviewed = True
+                elif name == "Skill" and str(inp.get("skill", "")).split(":")[-1] == "code-review":
+                    reviewed = True
+                elif REVIEW_IN_CODE.search(str(inp.get("code", ""))):
+                    reviewed = True
+    if flow and not reviewed and since is not None and data.get("cwd"):
+        try:
+            for path, n in git_changes(data["cwd"], since - 1).items():
+                per_file[path] = max(per_file.get(path, 0), n)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+except Exception:
+    sys.exit(0)
+
+changed = sum(per_file.values())
+if flow and not reviewed and (changed > 200 or len(per_file) > 3):
+    print(json.dumps({"decision": "block", "reason":
+        "This turn changed %d lines in %d files, which is Big (Code flow step 8), but no `reviewer` ran. "
+        "Run the `reviewer` agent on the diff now and fix its P0/P1; animation in the diff → also `review-animations`. "
+        "A ✗ in the Exit does not replace the review." % (changed, len(per_file))}))
+sys.exit(0)
