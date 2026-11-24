@@ -168,8 +168,22 @@ A wayfinder + bug-fix session on 2026-11-19 in a private Spring workspace ($11.1
 |---|---|
 | `agents/codebase-memory.md`, `-auditor.md`, `-scout.md` | 0 calls in 254 local session transcripts |
 
+## Changed after the Floating Island eval
+
+Sonnet 5.5 at medium effort built a single-file three.js app (n = 3 per config) and then did a fix plus a feature on a shared base. There were four configs: this file ("with"), no CLAUDE.md ("without"), design skills removed from routing ("noskill"), and a draft with a Stop hook ("v2"). Report: `~/projects/claude-md-eval-island/REPORT-v2.md` (local).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Review on Big diffs (`hooks/reviewer-gate`, step 8) | With the rule only in text, `reviewer` ran in 1 of 3 "with" builds and 2 of 3 "noskill" builds, though every diff was over 200 lines. With the Stop hook it ran in 3 of 3. Each review found 3 P1s, and the agent fixed them | Stop-feedback lines in `logs/v2-b*/seg0.jsonl` | New Stop hook: it blocks once when a turn with a Flow line changed over 200 lines or more than 3 files and no review ran. It also counts files git sees changed since the prompt, so REPL and subagent writes count |
+| Design skills are optional (Route UI and Video rows, `rules/frontend.md`, `rules/video.md`) | Forcing `ui-ux-pro-max` and `hallmark` did not raise blind scores: with 7.0, noskill 6.7, v2 5.7, and one judge's score for the same build moved by up to 3 points between passes. Once the UI row lost its lead skill, one run routed a 3D app in a repo as an Artifact and skipped the 375 px shots | `logs/judge-v2.md`, v2-b3 final reply | The UI row names "page, component, canvas or WebGL app" and has no lead skill. The Artifact row says "published with the Artifact tool, no repo". Video toolchain skills move to `video.md`, which now owns that list and replaces the "Video row owns the list" change above |
+| Tests live in the repo (step 6) | In the fix task, "with" and "without" left 0 of 6 tests in the repo: the tests sat in `/tmp` or did not exist. With this sentence, 3 of 3 v2 runs committed a test that failed first | fix table in the report, `git log --stat` of each app | One sentence in step 6 |
+| Small tier (Code flow) | Every fix run passed the hidden checks except one "without" run, which shipped broken persistence and never opened a browser. v2 took 6.0 min (median) where "without" took 1.0 | `logs/score/without-f2/persist.json` | Small: at most 2 files and 80 lines, with no Big, untrusted-input or secrets trigger. It runs steps 1 to 3, 6 and 7, so it keeps a test and a look |
+| P0-only re-check (Code Done-when, step 8) | No review across 6 runs found a P0, and no run did the re-check | the final replies of the reviewed runs | The re-check runs only after a P0. This replaces the 2026-11-17 wording above |
+| Untrusted input (Code flow) | v2-f1 restored `localStorage` with no validation or cap. Only v2-f3 ran a security review, which found that the restore loop had no upper bound | v2-f1 `index.html:599`, v2-f3 commit `52e7ce9` | Now defined by source and sink, for any stack. It includes browser storage, LLM output, and a loop or allocation sized by the input |
+
 ## Still open
 
 - `explorer`, `tester` and `evidence-auditor` also show 0 calls. `explorer` stays, because it is meant to keep code search cheap; the reason it is never picked is not known yet.
 - The cost of the full config: about 1.2× (backend task) to 1.6× (UI task) the bare cost in run 2, down from 1.9× in run 1.
+- Not re-run yet: the Small tier and the new UI and Video wording (November eval above).
 - Not measured: whether skipping the graph misses call sites in a large refactor, and whether three reviewers on every commit (another commenter's setup) catch more than one reviewer on big diffs.

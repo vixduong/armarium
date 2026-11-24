@@ -6,11 +6,11 @@ paths:
   - "**/{lesson,video,render,remotion,manim}.config.{json,ts,js,mjs,toml,yaml,yml}"
 ---
 # Video gate
-Invoke the lead skills of CLAUDE.md's Video row FIRST.
+Invoke the toolchain skill FIRST: Remotion project or batch renders from data → `remotion-best-practices` + `lean-build` + `tdd` · film in a named Lemo-Opuscar style → `lemo-opuscar:lemo-opuscar` · other video by code → `hyperframes:hyperframes`. Design skills are optional (`ui-ux-pro-max` for an open look-and-feel question).
 The user gives a reference video or link → suggest `/video-ref <link>` (frames per scene, contact sheet, subtitles).
 
-## Lead skills
-- **Load per project.** A lead skill missing from the skill list → in the video repo run `claude plugin enable hyperframes@hyperframes --scope project` (or `lemo-opuscar@lemolab`); for Remotion add `"skillOverrides": {"remotion-best-practices": "on"}` to `.claude/settings.json`. The user then runs `/reload-plugins`.
+## Toolchain skills
+- **Load per project.** A toolchain skill missing from the skill list → in the video repo run `claude plugin enable hyperframes@hyperframes --scope project` (or `lemo-opuscar@lemolab`); for Remotion add `"skillOverrides": {"remotion-best-practices": "on"}` to `.claude/settings.json`. The user then runs `/reload-plugins`.
 - **HyperFrames and Lemo-Opuscar own the build loop**: it replaces Code flow steps 4 (plan mode) and 6 (TDD). The gate below stays the acceptance check; reuse what their loop already made as its evidence. Remotion keeps the whole Code flow.
 - **HyperFrames**: `npx hyperframes check --json` audits layout and contrast, and its `sweep_static` flags 3 s+ with no change (blank frames still need item 2). `snapshot --at`/`--range` and `measure frames --range` give item 3's frames; `measure cuts` finds the cuts a scene score misses. Its rules keep key text in the 80 % title-safe box, inside item 6's margin. Renders seek a paused timeline, so item 4 should pass first time.
 - **Lemo-Opuscar**: `~/lemo-opuscar/DIRECTOR.md` §11 checks black and NaN frames, −14 LUFS loudness and subtitle sync; its review loop (`~/lemo-opuscar/TECHNIQUE.md` §8) makes contact sheets and 0.2 s strips for item 3. Gate findings join its one fix round.

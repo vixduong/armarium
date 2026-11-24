@@ -3,7 +3,7 @@ paths:
   - "**/*.{tsx,jsx,vue,svelte,css,scss,html}"
 ---
 # Frontend gate
-Invoke `ui-ux-pro-max` FIRST. Chart, dashboard, or stat tile → also `dataviz`. New site or page built from scratch → also `hallmark` (on an existing design only when the user names it).
+Design skills are optional: `ui-ux-pro-max` for an open look-and-feel question, `dataviz` for a chart, dashboard, or stat tile, `hallmark` only when the user names it. Steps 4 and 6 are the acceptance check.
 
 1. **Reuse** — the project's design tokens and components come before a new colour, spacing value, or component.
 2. **Explore** — new screen or an open "make it look good" → show 2–3 directions, build the chosen one. Least-code rules size the build, not the exploration.
