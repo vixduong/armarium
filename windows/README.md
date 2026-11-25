@@ -20,7 +20,7 @@ pwsh windows\install.ps1          # dry run: lists new / replace per file
 pwsh windows\install.ps1 -Apply   # writes; each replaced file is copied to ~\.claude\backups\armarium-<time>\
 ```
 
-The installer rewrites three lines of `CLAUDE.md` that assume macOS and zsh (the `codebase-memory-mcp` path, the shell bullet, the RTK bullet) and stops if one is missing. It never touches `skills/`, `settings.json` or `settings.local.json`, and it never deletes: no setting calls the PowerShell hooks an older install left in `~\.claude\hooks` (`bash-ban-raw-tools.ps1`, `cbm-session-reminder.ps1`, `codemode-ponytail-band.ps1`, `memory-repo-symlink.ps1`, `run-cli-hook.ps1`), so delete them by hand.
+The installer rewrites three lines of `CLAUDE.md` that assume macOS and zsh (the `codebase-memory-mcp` path, the shell bullet, the RTK bullet) and stops if one is missing. It copies the repo's own `skills/` (other skills on the machine stay), never touches `settings.json` or `settings.local.json`, and it never deletes: no setting calls the PowerShell hooks an older install left in `~\.claude\hooks` (`bash-ban-raw-tools.ps1`, `cbm-session-reminder.ps1`, `codemode-ponytail-band.ps1`, `memory-repo-symlink.ps1`, `run-cli-hook.ps1`), so delete them by hand.
 
 Then merge `settings.example.json` into `~\.claude\settings.json` by hand and replace `C:/Users/YOU` with your profile path (forward slashes work in Bash and PowerShell hooks alike).
 

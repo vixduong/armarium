@@ -1,5 +1,5 @@
 # Overlay claude/ then windows/ onto ~/.claude. Dry run unless -Apply; every file it replaces is backed up first.
-# Never touches skills/, settings.json or settings.local.json: merge settings.example.json by hand, skills stay per machine.
+# Never touches settings.json or settings.local.json: merge settings.example.json by hand. skills/ gets only the repo's own skills; other skills on the machine stay.
 param([switch]$Apply)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
@@ -7,7 +7,7 @@ $dest = Join-Path $env:USERPROFILE '.claude'
 $bak  = Join-Path $dest ("backups\armarium-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 
 # claude/ items that need bash or macOS, or that Windows replaces from windows/
-$skip = 'skills', 'settings.example.json', 'statusline-command.sh',
+$skip = 'settings.example.json', 'statusline-command.sh',
         'bash-ban-raw-tools', 'run-cli-hook', 'cbm-session-reminder',
         'memory-repo-symlink', 'codemode-ponytail-band'
 # CLAUDE.md lines that assume macOS/zsh; each must match once, or the repo text has drifted
