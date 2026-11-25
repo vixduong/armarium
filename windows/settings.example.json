@@ -96,7 +96,7 @@
           },
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/memory-repo-symlink.ps1",
+            "command": "python C:/Users/YOU/.claude/hooks/memory_repo_symlink.py",
             "timeout": 10
           },
           {
@@ -106,12 +106,12 @@
           },
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/cbm-session-reminder.ps1",
+            "command": "python C:/Users/YOU/.claude/hooks/cbm_session_reminder.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/YOU/.claude/hooks/codemode-ponytail-band.ps1",
+            "command": "python C:/Users/YOU/.claude/hooks/codemode_ponytail_band.py",
             "timeout": 5
           }
         ]

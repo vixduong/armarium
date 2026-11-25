@@ -47,7 +47,7 @@ esac
 
 # Catch truncation pipes only when pipeline source is a file-reader (cat/grep/rg/find).
 # `curl | head`, `git log | head`, `browse ... | head` are fine — they produce bounded output.
-if echo "$CMD" | grep -qE '\|\s*(tail|head)\b' && echo "$FIRST" | grep -qE '^(cat|grep|rg|find)$'; then
+if echo "$CMD" | grep -qE '\|\s*(tail|head)([^-[:alnum:]_]|$)' && echo "$FIRST" | grep -qE '^(cat|grep|rg|find)$'; then
   cat >&2 <<EOF
 BLOCKED: '| tail'/'| head' pipeline. Output truncation not allowed — raw output still floods context before trim.
 

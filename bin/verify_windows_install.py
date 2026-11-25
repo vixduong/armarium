@@ -20,7 +20,7 @@ check("worktree.baseRef is fresh", s.get("worktree", {}).get("baseRef") == "fres
 check("statusLine runs statusline.py", s.get("statusLine", {}).get("command", "").endswith("/.claude/statusline.py"))
 start = [h["command"] for g in s.get("hooks", {}).get("SessionStart", []) for h in g["hooks"]]
 for want in ("hooks/armarium-links", "hooks/skill-model-invocable review-animations",  # new
-             "hooks/memory-repo-symlink.ps1", "hooks/cbm-session-reminder.ps1", "hooks/codemode-ponytail-band.ps1"):  # kept
+             "hooks/memory_repo_symlink.py", "hooks/cbm_session_reminder.py", "hooks/codemode_ponytail_band.py"):  # kept
     check("SessionStart runs " + want, any(c.endswith(want) or want + " " in c for c in start))
 check("armarium-links runs first", bool(start) and start[0].endswith("hooks/armarium-links"))
 

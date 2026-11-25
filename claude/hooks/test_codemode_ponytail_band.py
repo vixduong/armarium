@@ -3,8 +3,9 @@ Builds a fake HOME with a ponytail install record, so the real plugin cache is n
 import json, os, subprocess, sys, tempfile
 
 HOOK = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "codemode-ponytail-band")]  # beside this test
-if sys.platform == "win32":
-    HOOK = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", HOOK[0] + ".ps1"]
+if sys.platform == "win32":  # the Windows hook is Python: beside this test once installed, else in this repo's windows/hooks
+    here = os.path.dirname(os.path.abspath(__file__))
+    HOOK = [sys.executable, next(p for p in (os.path.join(here, "codemode_ponytail_band.py"), os.path.join(here, "..", "..", "windows", "hooks", "codemode_ponytail_band.py")) if os.path.exists(p))]
 
 
 def run(hooks_field, code_mode, registered=True):

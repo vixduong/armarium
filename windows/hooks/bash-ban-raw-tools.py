@@ -51,7 +51,7 @@ def main():
     readers = "cat|head|tail|find|grep|rg|wc|Get-Content|gc|Select-String|sls|findstr" + typ
 
     # A truncation pipe after a file reader still floods context before the trim.
-    if re.search(r"\|\s*(tail|head)\b", cmd, re.I) and re.match(
+    if re.search(r"\|\s*(tail|head)(?![-\w])", cmd, re.I) and re.match(
             r"^(cat|grep|rg|find|Get-Content|gc|Select-String|sls|findstr%s)$" % typ, first, re.I):
         sys.stderr.write(PIPE_MSG + "\n")
         return 2

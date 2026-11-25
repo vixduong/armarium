@@ -23,6 +23,7 @@ $files = foreach ($root in 'claude', 'windows') {
   Get-ChildItem $base -Recurse -File | Where-Object {
     $rel = $_.FullName.Substring($base.Length + 1)
     $parts = $rel -split '\\'
+    -not ($parts -contains '__pycache__') -and
     -not ($root -eq 'windows' -and ($rel -in 'install.ps1', 'README.md', 'settings.example.json')) -and
     -not ($root -eq 'claude' -and ($parts | Where-Object { $_ -in $skip }))
   } | ForEach-Object { [pscustomobject]@{ Src = $_.FullName; Rel = $_.FullName.Substring($base.Length + 1) } }

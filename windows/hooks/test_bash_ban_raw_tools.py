@@ -42,6 +42,7 @@ check("pipe after non-reader passes", gate("ls | head -3")[0], 0)
 # rtk resolves: readers defer to the rtk rewrite, the pipe rule still blocks
 check("reader with rtk", gate("cat a.txt", env=RESOLVED)[0], 0)
 check("pipe with rtk", gate("grep x f | tail", env=RESOLVED)[0], 2)
+check("head-foo is no head pipe", gate("grep x f | head-foo", env=RESOLVED)[0], 0)
 # unlock file, keyed on the hook's parent (this process)
 unlock = os.path.join(tmp, "bash-raw-unlock-%d" % os.getpid())
 open(unlock, "w").close()
@@ -63,6 +64,8 @@ open(on_path, "w").close(); os.chmod(on_path, 0o755)
 rc, out = shim(["--which", "rtk"], dict(BASE, PATH=bindir))
 check("which: PATH hit", (rc, os.path.normcase(out)), (0, os.path.normcase(on_path)))  # PATHEXT is upper case
 check("which: override", shim(["--which", "rtk"], RESOLVED), (0, fake_rtk))
+rc, out = shim(["--which", "rtk"], dict(BASE, PATH='"%s"' % bindir))  # Windows PATH entries may be quoted
+check("which: quoted PATH entry", (rc, os.path.normcase(out)), (0, os.path.normcase(on_path)))
 check("missing bin passes", shim(["nosuchtool", "x"])[0], 0)
 # passthrough: stdin bytes in, stdout and exit code out (the child is python itself via the override)
 echo = ["echo3", "-c", "import sys; sys.stdout.write(sys.stdin.read()); sys.exit(3)"]
