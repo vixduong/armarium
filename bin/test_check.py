@@ -24,7 +24,7 @@ def fixture(files=None, settings=SETTINGS, skills=None, home_files=None):
     for rel, text in base.items():
         p = os.path.join(repo, rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:  # check reads UTF-8; Windows' default is the ANSI code page
             f.write(text)
         if rel.startswith("claude/hooks/") and not rel.endswith(".py"):
             os.chmod(p, 0o755)
@@ -38,14 +38,16 @@ def fixture(files=None, settings=SETTINGS, skills=None, home_files=None):
     for rel, text in (home_files or {}).items():
         p = os.path.join(home, rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)
-        with open(p, "w") as f:
-            f.write(text.replace("{HOME}", home))
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(text.replace("{HOME}", home.replace("\\", "/")))  # inside JSON: a backslash path is not a valid string
     return repo, home
 
 
 def run(repo, home):
-    p = subprocess.run([sys.executable, CHECK, repo], capture_output=True, text=True,
-                       env={"HOME": home, "PATH": os.environ["PATH"]})
+    env = {"HOME": home, "PATH": os.environ["PATH"]}
+    if sys.platform == "win32":  # expanduser reads USERPROFILE there, so HOME alone left the real ~/.claude in play
+        env.update(USERPROFILE=home, SystemRoot=os.environ["SystemRoot"])
+    p = subprocess.run([sys.executable, CHECK, repo], capture_output=True, text=True, env=env)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -73,8 +75,9 @@ case("dead bare .md pointer", 1, "enforcement.md",
      files={"claude/CODING_STANDARDS.md": "See `enforcement.md` (AC-09).\n"})
 case("settings calls a hook the repo lacks", 1, "hooks/missing-hook",
      settings={"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "~/.claude/hooks/missing-hook"}]}]}})
-case("hook not executable", 1, "hooks/good-hook",
-     pre=lambda repo: os.chmod(os.path.join(repo, "claude/hooks/good-hook"), stat.S_IRUSR | stat.S_IWUSR))
+if sys.platform != "win32":  # Windows has no exec bit: os.access(X_OK) is always true there
+    case("hook not executable", 1, "hooks/good-hook",
+         pre=lambda repo: os.chmod(os.path.join(repo, "claude/hooks/good-hook"), stat.S_IRUSR | stat.S_IWUSR))
 case("model told to call a user-only skill", 1, "anim", skills={"anim": LOCKED})
 case("user-only skill written as /name passes", 0, "check: ok", skills={"anim": LOCKED},
      files={"claude/CLAUDE.md": "Suggest `/anim`.\n"})
@@ -145,6 +148,15 @@ case("plugin the settings declare but this machine lacks is skipped", 0, "check:
 case("plugin prefix neither declared nor installed still fails", 1, "hx:hf",
      settings=dict(SETTINGS, enabledPlugins={"hf@mk": False}),
      files={"claude/CLAUDE.md": ROUTE + "| Video | Code flow | `hx:hf` | done |\n"})
+
+# Windows hooks run in the user's project, and CreateProcess searches that cwd before PATH
+case("bare program name in a Windows hook", 1, "runs bare 'git'",
+     files={"windows/hooks/x.py": 'import subprocess\nsubprocess.run(["git", "status"])\n'})
+case("bare program at the head of a concatenated argv", 1, "runs bare 'git'",
+     files={"windows/statusline.py": 'import subprocess\nargs = ["x"]\nsubprocess.run(("git", "-C", ".") + tuple(args))\n'})
+case("full path, resolved or computed program passes", 0, "check: ok",
+     files={"windows/hooks/x.py": 'import os, subprocess, sys\nexe = "x"\nsubprocess.run(["C:/Windows/System32/cmd.exe", "/c"])\n'
+            'subprocess.Popen([exe, "a"])\nsubprocess.run([sys.executable, "-I"])\nsubprocess.run([exe] + ["b"])\n'})
 
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

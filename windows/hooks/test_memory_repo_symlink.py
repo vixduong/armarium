@@ -6,6 +6,8 @@ touching its old target; a linked worktree uses the main checkout; the ~/.claude
 import os, re, shutil, subprocess, sys, tempfile
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_repo_symlink.py")
+for k in [k for k in os.environ if k.startswith("GIT_")]:  # git exports GIT_INDEX_FILE to a pre-commit hook: the throwaway repos would use the real index
+    del os.environ[k]
 NT = os.name == "nt"
 fails = 0
 

@@ -97,6 +97,7 @@ class LocalFile(unittest.TestCase):
             self.assertAlmostEqual(index["duration"], 6.0, delta=0.2)
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg missing")
+@unittest.skipIf(sys.platform == "win32", "fake tool bin: symlinks and extensionless scripts need POSIX")
 class MissingTool(unittest.TestCase):
     def test_link_without_yt_dlp_exits_3_and_leaves_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -122,6 +123,7 @@ with open(os.path.join(out, "source.info.json"), "w") as f:
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg missing")
+@unittest.skipIf(sys.platform == "win32", "fake tool bin: symlinks and extensionless scripts need POSIX")
 class FakeDownload(unittest.TestCase):
     """A fake yt-dlp on PATH copies a local clip, so the link path runs offline."""
 

@@ -91,12 +91,17 @@ home = tempfile.mkdtemp()
 real = os.path.join(home, ".agents", "skills", "anim")
 os.makedirs(real)
 os.makedirs(os.path.join(home, ".claude", "skills"))
-os.symlink(real, os.path.join(home, ".claude", "skills", "anim"))
-with open(os.path.join(real, "SKILL.md"), "w") as f:
-    f.write(SKILL)
-subprocess.run([sys.executable, HOOK, "anim"], capture_output=True, env=env(home))
-with open(os.path.join(real, "SKILL.md")) as f:
-    check("symlinked skill dir: the target file is unlocked", f.read() == UNLOCKED)
+try:
+    os.symlink(real, os.path.join(home, ".claude", "skills", "anim"))
+except OSError as e:
+    if getattr(e, "winerror", None) != 1314: raise
+    print("skip symlinked skill dir: Windows allows symlinks only with Developer Mode or elevated")
+else:
+    with open(os.path.join(real, "SKILL.md"), "w") as f:
+        f.write(SKILL)
+    subprocess.run([sys.executable, HOOK, "anim"], capture_output=True, env=env(home))
+    with open(os.path.join(real, "SKILL.md")) as f:
+        check("symlinked skill dir: the target file is unlocked", f.read() == UNLOCKED)
 
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

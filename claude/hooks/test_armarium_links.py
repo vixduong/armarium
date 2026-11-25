@@ -3,6 +3,12 @@ Builds a throwaway git repo and a fake HOME, so the real ~/.claude is never read
 import json, os, subprocess, sys, tempfile
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "armarium-links")  # the hook beside this test, not the installed one
+with tempfile.TemporaryDirectory() as probe:  # the hook and every case need symlinks
+    try:
+        os.symlink(probe, os.path.join(probe, "link"))
+    except OSError as e:
+        if getattr(e, "winerror", None) != 1314: raise
+        print("skip: Windows allows symlinks only with Developer Mode or elevated"); sys.exit(0)
 
 
 def setup(link_claude_md=True):

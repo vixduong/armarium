@@ -5,10 +5,12 @@
 - Pointers: every `~/.claude/<file>` in claude/**/*.md exists in claude/ or ~/.claude; every bare `<name>.md` exists in claude/.
 - Names: every Route lead-skill name, and every `plugin:skill` of an installed plugin, is an installed skill, an agent or built in;
   a plugin the settings declare but this machine lacks is skipped.
+- Exec: a windows/ hook never starts a bare program name (Windows searches the cwd, the user's project, first).
+  Reads list/tuple argv, also as the left side of +; os.system, shell=True strings and argv held in a variable are not read.
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
   unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
 Self-test: python3 -I bin/test_check.py"""
-import glob, json, os, re, subprocess, sys
+import ast, glob, json, ntpath, os, re, subprocess, sys
 
 REPO = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), ".."))
 CLAUDE = os.path.join(REPO, "claude")
@@ -162,6 +164,26 @@ for md in [os.path.join(CLAUDE, "CLAUDE.md")] + glob.glob(os.path.join(CLAUDE, "
                 full = name if ":" in name or not owner(skill) else "%s:%s" % (owner(skill), name)
                 problems.append("%s tells the model to call `%s`, which is user-only: write `/%s`, or unlock it with skill-model-invocable"
                                 % (rel(md), name, full))
+
+# Exec: argv[0] of a subprocess call in a windows/ hook is a full path or a value (resolve(), sys.executable), never a literal name
+for py in glob.glob(os.path.join(REPO, "windows", "**", "*.py"), recursive=True):
+    if os.path.basename(py).startswith("test_"):  # tests run in a temp dir, not in the user's project
+        continue
+    with open(py, encoding="utf-8") as fh:
+        tree = ast.parse(fh.read(), py)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("run", "Popen", "call", "check_call", "check_output")
+                and node.args):
+            argv = node.args[0]
+            while isinstance(argv, ast.BinOp):  # ["git", "-C", cwd] + list(args)
+                argv = argv.left
+            if not (isinstance(argv, (ast.List, ast.Tuple)) and argv.elts):
+                continue
+            head = argv.elts[0]
+            if isinstance(head, ast.Constant) and isinstance(head.value, str) and not ntpath.isabs(head.value):  # Windows rules on every OS
+                problems.append("%s:%d runs bare %r: Windows searches the cwd (the user's project) first; use resolve() or a full path"
+                                % (rel(py), node.lineno, head.value))
 
 for p in problems:
     print("FAIL " + p)

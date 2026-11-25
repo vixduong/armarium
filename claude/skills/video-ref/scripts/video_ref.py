@@ -11,7 +11,8 @@ def check_source(s):
     p = urlparse(s)
     if p.scheme in ("http", "https") and p.netloc:
         return ("url", s)
-    if s and not s.startswith("-") and not p.scheme and os.path.isfile(s):
+    drive = os.path.splitdrive(s)[0]  # Windows: urlparse reads "C:\x" as scheme "c"
+    if s and not s.startswith("-") and (not p.scheme or drive) and os.path.isfile(s):
         return ("file", os.path.abspath(s))
     raise ValueError("not an http(s) link or an existing file: %r" % s)
 

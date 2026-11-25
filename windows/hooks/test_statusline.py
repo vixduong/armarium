@@ -7,9 +7,9 @@ ANSI = re.compile(r"\x1b\[[0-9;]*m")
 fails = 0
 
 
-def run(payload, raw=None):
+def run(payload, raw=None, cwd=None, env=None):
     data = raw if raw is not None else json.dumps(payload).encode()
-    p = subprocess.run([sys.executable, SL], input=data, capture_output=True)
+    p = subprocess.run([sys.executable, SL], input=data, capture_output=True, cwd=cwd, env=env)
     return p.returncode, p.stdout.decode("utf-8").replace("\r", "")
 
 
@@ -61,6 +61,14 @@ subprocess.run(["git", "init", "-q", "-b", "feat-x", repo], check=True)
 open(os.path.join(repo, "f.txt"), "w").close()
 rc, out = run({"workspace": {"current_dir": repo}})
 check("git dirty", ANSI.sub("", out), os.path.basename(repo) + " · git feat-x*\n")
+if os.name == "nt":  # a git.exe in the status line's cwd (the user's project) never runs: git comes from PATH
+    import shutil
+    evil = tempfile.mkdtemp(prefix="slevil")
+    shutil.copy(sys.executable, os.path.join(evil, "git.exe"))  # a python.exe that cannot answer git
+    # Claude Code sets NoDefaultCurrentDirectoryInExePath for its children; the hook must not depend on it
+    env = {k: v for k, v in os.environ.items() if k.lower() != "nodefaultcurrentdirectoryinexepath"}
+    rc, out = run({"workspace": {"current_dir": repo}}, cwd=evil, env=env)
+    check("cwd git.exe not run", ANSI.sub("", out), os.path.basename(repo) + " · git feat-x*\n")
 
 print("FAILS", fails)
 sys.exit(1 if fails else 0)

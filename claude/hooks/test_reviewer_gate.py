@@ -80,10 +80,16 @@ with tempfile.TemporaryDirectory() as repo:
     if blocked(r): fails += 1; print("FAIL untracked binary does not count: %s" % (r,))
     os.remove(os.path.join(repo, "shot.png"))
     outside = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False); outside.write("z\n" * 300); outside.close()
-    os.symlink(outside.name, os.path.join(repo, "link.js"))
-    r = run(REPL_TURN, cwd=repo)
-    if blocked(r): fails += 1; print("FAIL untracked symlink is not followed: %s" % (r,))
-    os.remove(os.path.join(repo, "link.js")); os.remove(outside.name)
+    try:
+        os.symlink(outside.name, os.path.join(repo, "link.js"))
+    except OSError as e:
+        if getattr(e, "winerror", None) != 1314: raise
+        print("skip untracked symlink: Windows allows symlinks only with Developer Mode or elevated")
+    else:
+        r = run(REPL_TURN, cwd=repo)
+        if blocked(r): fails += 1; print("FAIL untracked symlink is not followed: %s" % (r,))
+        os.remove(os.path.join(repo, "link.js"))
+    os.remove(outside.name)
     lines_file(os.path.join(repo, "t.js"), 10); git(repo, "add", "t.js")
     git(repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "t")
     lines_file(os.path.join(repo, "t.js"), 230)

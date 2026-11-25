@@ -5,6 +5,10 @@
 import json, math, os, re, subprocess, sys, time
 from decimal import Decimal, ROUND_HALF_UP
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "hooks"))  # run_cli_hook.py sits in hooks/ beside this file
+sys.dont_write_bytecode = True  # no __pycache__ in the hooks folder (install.ps1 would copy it)
+from run_cli_hook import resolve  # noqa: E402
+
 sys.stdout.reconfigure(encoding="utf-8")
 
 
@@ -34,10 +38,14 @@ def get(d, *path):
 DOT = dim(" · ")
 BAR = dim(" | ")
 
+GIT = resolve("git")  # PATH only: a bare "git" also runs a git.exe in the cwd, the user's project
+
 
 def git(cwd, *args):
+    if not GIT:
+        return ""
     try:
-        r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True, encoding="utf-8",
+        r = subprocess.run([GIT, "-C", cwd] + list(args), capture_output=True, text=True, encoding="utf-8",
                            env=dict(os.environ, GIT_OPTIONAL_LOCKS="0"))
         return r.stdout.strip() if r.returncode == 0 else ""
     except OSError:
