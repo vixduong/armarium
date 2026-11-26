@@ -59,7 +59,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
    - Model: every `reviewer` call runs at least on the tier that wrote the code, capped at opus, and on opus when hard to undo (auth/permission, secrets, money, migration), whatever the size: pass `model` to `subagent`; otherwise the tier pi settings `subagents.agentOverrides` pin. A review that still missed a bug → one tier up.
    - Fix every P0/P1 → back to 7; a P0 was found → one P0-only re-check. Still P0 after 2 rounds → stop and report. A P0/P1 you cannot fix (it needs access, an environment or a decision you lack) stays ✗ in Exit, naming what it needs and from whom. P2 → list in the final reply.
 
-**New gate** for a stack or medium: `rules/<name>.md` in armarium's `claude/common/`, installed to `~/.pi/agent/rules/`; first line names the toolchain skill to load FIRST if the stack has one, then a numbered self-check; add its row to Route.
+**New gate** for a stack or medium: `rules/<name>.md` in armarium's `claude/common/`; first line names the toolchain skill to load FIRST if the stack has one, then a numbered self-check; add its row to Route.
 
 ## Tools
 - **Text search**: in a git repo `git grep -n`; else `rg`/`find` through `bash`.

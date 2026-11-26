@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Gate for this repo: bin/check [repo]. Runs every self-test and the static checks below; exit 1 on any problem.
 Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows/ each overlay it onto ~/.claude.
-- JSON: every settings.example.json (claude/unix, claude/windows, pi/common) parses.
+- JSON: every settings.example.json (claude/unix, claude/windows, pi) parses.
 - Settings: every ~/.claude/... path a setting calls exists in its OS dir or common/; unix hooks are executable.
 - Pointers: every `~/.claude/<file>` in common/ and unix/ *.md exists there or in ~/.claude; every bare `<name>.md` exists there.
 - Names: every Route lead-skill name, and every `plugin:skill` of an installed plugin, is an installed skill, an agent or built in;
@@ -32,7 +32,7 @@ tests = sorted(glob.glob(os.path.join(CLAUDE, "hooks", "test_*.py")) + glob.glob
                + glob.glob(os.path.join(CLAUDE, "skills", "*", "scripts", "test_*.py"))
                + glob.glob(os.path.join(UNIX, "hooks", "test_*.py"))
                + glob.glob(os.path.join(WINDOWS, "hooks", "test_*.py"))
-               + glob.glob(os.path.join(REPO, "pi", "*", "test_*.py")))
+               + glob.glob(os.path.join(REPO, "pi", "test_*.py")))
 for t in tests:
     p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True)
     if p.returncode:
@@ -40,7 +40,7 @@ for t in tests:
 
 # JSON
 settings = {}  # file -> parsed settings
-for f in [UNIX_SETTINGS, WINDOWS_SETTINGS, "pi/common/settings.example.json"]:
+for f in [UNIX_SETTINGS, WINDOWS_SETTINGS, "pi/settings.example.json"]:
     path = os.path.join(REPO, f)
     if not os.path.exists(path):
         if f == UNIX_SETTINGS:

@@ -1,0 +1,8 @@
+{
+  "name": "armarium-pi",
+  "private": true,
+  "type": "module",
+  "pi": {
+    "extensions": ["./extension.ts"]
+  }
+}
