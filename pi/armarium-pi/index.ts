@@ -1,13 +1,13 @@
 // Loads armarium's pi rules (AGENTS.md) as a context file, its ~/.pi/agent/ pointers resolved to the repo's shared docs.
-// Self-test: python3 -I pi/test_extension.py
+// Self-test: python3 -I pi/test_armarium_pi.py
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const path = join(here, "AGENTS.md");
-const shared = join(here, "..", "claude", "common") + "/";
+const path = join(here, "..", "AGENTS.md");
+const shared = join(here, "..", "..", "claude", "common") + "/";
 
 export default function (pi: ExtensionAPI) {
 	// contextFiles is rebuilt for each run, so read on each run: an edit to AGENTS.md is live without /reload.

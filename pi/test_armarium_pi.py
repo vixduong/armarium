@@ -1,10 +1,10 @@
-"""Self-test for pi/extension.ts: python3 -I pi/test_extension.py
+"""Self-test for pi/armarium-pi/index.ts: python3 -I pi/test_armarium_pi.py
 Drives the extension's before_agent_start handler with a fake pi in node (needs node >= 22.18 for .ts); never touches ~/.pi."""
 import json, os, pathlib, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-EXT = os.path.join(HERE, "extension.ts")
+EXT = os.path.join(HERE, "armarium-pi", "index.ts")
 if not shutil.which("node"):
     print("skip: node not on PATH"); sys.exit(0)
 

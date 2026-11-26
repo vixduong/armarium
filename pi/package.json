@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "pi": {
-    "extensions": ["./extension.ts"]
+    "extensions": ["./armarium-pi/index.ts"]
   }
 }

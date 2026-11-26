@@ -35,7 +35,7 @@ claude/                      common/ plus one OS overlay mirrors ~/.claude
 └── windows/                 PowerShell hooks, status line, settings and installer; see claude/windows/README.md
 pi/                          the same rule set for the pi coding agent, as a pi package
 ├── AGENTS.md                the rules, in pi's tool, agent and skill names
-├── extension.ts             loads AGENTS.md into every pi run
+├── armarium-pi/index.ts     loads AGENTS.md into every pi run
 ├── package.json             the package manifest
 └── settings.example.json    opt-in: packages, skills, models, subagent tiers
 bin/check                    repo gate: self-tests and config checks; .githooks/pre-commit runs it
@@ -123,7 +123,7 @@ git ls-files claude/common claude/unix | grep -v settings.example.json | while r
 
 ### Pi
 
-`pi/AGENTS.md` carries the same Route table and flows as `claude/common/CLAUDE.md`, written for [pi](https://github.com/earendil-works/pi)'s tools, the `pi-subagents` agents and the skills under `~/.agents/skills`. `pi/` is a pi package. Install it once with `pi install /path/to/armarium/pi` on any OS, or put that path in `packages` in your `settings.json`, as the last entry in `settings.example.json` shows. Pi then loads `pi/extension.ts` from the repo, and before each run it adds `AGENTS.md` to the prompt, ahead of any project `AGENTS.md`, with its `~/.pi/agent/` paths pointed at `claude/common/`. Subagent runs and `--no-context-files` runs skip it, the same as a global `~/.pi/agent/AGENTS.md`. An edit to `AGENTS.md` applies from the next prompt. If an older install left `AGENTS.md`, `CODING_STANDARDS.md`, `RTK.md` or `rules/` in `~/.pi/agent`, remove them: nothing reads them now, and a leftover `AGENTS.md` loads the rules twice. `settings.example.json` is this machine's `settings.json` minus per-machine state. Merge the parts you want by hand and replace `/Users/YOU`. Pi runs none of the Claude Code hooks, so the rules they enforce depend on the model alone.
+`pi/AGENTS.md` carries the same Route table and flows as `claude/common/CLAUDE.md`, written for [pi](https://github.com/earendil-works/pi)'s tools, the `pi-subagents` agents and the skills under `~/.agents/skills`. `pi/` is a pi package. Install it once with `pi install /path/to/armarium/pi` on any OS, or put that path in `packages` in your `settings.json`, as the last entry in `settings.example.json` shows. Pi then loads `pi/armarium-pi/index.ts` from the repo, and before each run it adds `AGENTS.md` to the prompt, ahead of any project `AGENTS.md`, with its `~/.pi/agent/` paths pointed at `claude/common/`. Subagent runs and `--no-context-files` runs skip it, the same as a global `~/.pi/agent/AGENTS.md`. An edit to `AGENTS.md` applies from the next prompt. If an older install left `AGENTS.md`, `CODING_STANDARDS.md`, `RTK.md` or `rules/` in `~/.pi/agent`, remove them: nothing reads them now, and a leftover `AGENTS.md` loads the rules twice. `settings.example.json` is this machine's `settings.json` minus per-machine state. Merge the parts you want by hand and replace `/Users/YOU`. Pi runs none of the Claude Code hooks, so the rules they enforce depend on the model alone.
 
 Before you commit here, run `git config core.hooksPath .githooks` once, so `bin/check` runs on each commit.
 
