@@ -1,4 +1,5 @@
-// Loads armarium's pi rules (AGENTS.md) as a context file, its ~/.pi/agent/ pointers resolved to the repo's shared docs.
+// armarium-pi: loads armarium's pi rules (AGENTS.md) as a context file, its ~/.pi/agent/ pointers resolved to the repo's
+// shared docs; blocks tool calls until the run's `Flow:` line is written; asks the user before destructive or credential commands.
 // Self-test: python3 -I pi/test_armarium_pi.py
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -9,15 +10,101 @@ const here = dirname(fileURLToPath(import.meta.url));
 const path = join(here, "..", "AGENTS.md");
 const shared = join(here, "..", "..", "claude", "common") + "/";
 
+const FLOW_LINE = /^[\s>*_`#-]*Flow\s*:/m;
+const MAX_FLOW_BLOCKS = 2; // the 3rd message's calls go through: a model that cannot comply must not loop forever
+// shortcut: a pattern check on the command text, so variables, eval, aliases, scripts and other languages get past it;
+// upgrade to an allowlist or a sandbox if a model is seen evading it.
+// Command position: line start, after a shell separator or keyword, or after a wrapper; then VAR=x and a path prefix.
+const CMD = String.raw`(?:^\s*|[;&|({!\x60]\s*|\$\(\s*|\b(?:sudo|doas|rtk|xargs|exec|nohup|time|then|do|else|command|builtin|nice|env)\s+(?:-\S+\s+)*)(?:\w+=\S*\s+)*(?:\S*\/|\\)?`;
+const GIT = String.raw`\bgit\b(?:\s+-\S+(?:\s+[^-\s]\S*)?)*?\s+`; // global options such as -C dir, --no-pager
+const ARGS = String.raw`[^;&|\n]*\s`; // rest of the same command
+const RISKY: RegExp[] = [
+	/\bdrop\s+(?:database|schema|table)\b/i,
+	/\bdropdb\b/i,
+	/\btruncate\s+table\b/i,
+	/\bflushall\b/i,
+	new RegExp(CMD + String.raw`(?:kill|pkill|killall)\b`, "im"),
+	new RegExp(CMD + String.raw`rm\b` + ARGS + String.raw`(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\b`, "im"),
+	new RegExp(GIT + String.raw`push\b` + ARGS + String.raw`(?:--force\S*|--mirror\b|-[a-zA-Z]*f[a-zA-Z]*\b|\+\S+)`, "i"),
+	new RegExp(GIT + String.raw`reset\b` + ARGS + String.raw`--hard\b`, "i"),
+	new RegExp(GIT + String.raw`clean\b` + ARGS + String.raw`(?:-[a-zA-Z]*f|--force\b)`),
+	new RegExp(GIT + String.raw`commit\b` + ARGS + String.raw`-[a-zA-Z]*n[a-zA-Z]*\b`),
+	new RegExp(GIT + String.raw`checkout\b` + ARGS + String.raw`(?:--\s+)?\.(?:\s|$)`, "m"),
+	new RegExp(GIT + String.raw`restore\b` + ARGS + String.raw`\.(?:\s|$)`, "m"),
+	new RegExp(GIT + String.raw`branch\b` + ARGS + String.raw`-D\b`),
+	new RegExp(GIT + String.raw`stash\s+(?:drop|clear)\b`, "i"),
+	new RegExp(GIT + String.raw`remote\s+set-url\b`, "i"),
+	/--no-verify\b/,
+	/\bcredential\.helper\b/i,
+	new RegExp(GIT + String.raw`credential\s+fill\b`),
+	/\bgh\s+auth\s+(?:token|setup-git)\b/,
+	/\bgh\s+auth\s+status\b[^;&|\n]*\s(?:-t|--show-token)\b/,
+];
+// context-mode's tools run shell code outside bash, so their command fields are checked too.
+const SHELL_TOOLS = new Set(["bash", "ctx_execute", "ctx_execute_file", "ctx_batch"]);
+
+const strings = (v: unknown): string[] =>
+	typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : [];
+
 export default function (pi: ExtensionAPI) {
+	// Per session instance (subagent children get their own), reset on each user prompt.
+	let gated = false;
+	let flowSeen = false;
+	let attempts = 0; // assistant messages that called tools with no Flow line yet
+
 	// contextFiles is rebuilt for each run, so read on each run: an edit to AGENTS.md is live without /reload.
 	pi.on("before_agent_start", (event) => {
 		const o = event.systemPromptOptions;
+		if (event.messageType === "user") {
+			flowSeen = false;
+			attempts = 0;
+		}
 		// Same reach as a global ~/.pi/agent/AGENTS.md: off under --no-context-files, and pi-subagents children
 		// (tagged <active_agent .../>) get no global context by default.
+		gated = false;
 		if (process.argv.includes("--no-context-files") || process.argv.includes("-nc")) return;
 		if (`${o.customPrompt ?? ""}${o.appendSystemPrompt ?? ""}`.includes("<active_agent ")) return;
+		gated = true;
 		// Global rules go first so a project AGENTS.md after them can override, as pi orders a global file.
 		o.contextFiles.unshift({ path, content: readFileSync(path, "utf8").replaceAll("~/.pi/agent/", () => shared) });
+	});
+
+	pi.on("message_end", (event) => {
+		const m = event.message as { role?: string; content?: unknown };
+		if (m.role !== "assistant" || !Array.isArray(m.content)) return;
+		const parts = m.content as { type?: string; text?: string }[];
+		if (FLOW_LINE.test(parts.map((c) => (c.type === "text" ? c.text : "")).join("\n"))) flowSeen = true;
+		else if (!flowSeen && parts.some((c) => c.type === "toolCall")) attempts++;
+	});
+
+	pi.on("tool_call", async (event, ctx) => {
+		if (gated && !flowSeen && attempts <= MAX_FLOW_BLOCKS) {
+			return {
+				block: true,
+				reason:
+					"armarium-pi: write a plain line starting `Flow:` (pi/AGENTS.md Route) in your reply text, not in thinking, " +
+					"then call tools. A chat answer that calls tools writes `Flow: answer directly`.",
+			};
+		}
+		if (!SHELL_TOOLS.has(event.toolName)) return;
+		const input = event.input as { command?: unknown; commands?: unknown; code?: unknown };
+		const command = strings([input.command, input.commands, input.code]).join("\n");
+		const hit = RISKY.map((p) => command.match(p)).find(Boolean);
+		if (!hit) return;
+		const start = Math.max(command.lastIndexOf("\n", hit.index ?? 0) + 1, (hit.index ?? 0) - 40);
+		const end = command.indexOf("\n", (hit.index ?? 0) + hit[0].length);
+		const line = command.slice(start, end < 0 ? undefined : end).trim();
+		const reason =
+			"armarium-pi: this command is destructive or touches credentials, so it needs the user's yes. " +
+			"Stop and ask the user in your reply (a subagent asks its supervisor with contact_supervisor).";
+		if (!ctx.hasUI) return { block: true, reason };
+		// The match goes first so padding cannot push the risky part out of the dialog.
+		const shown = command.length > 800 ? `${command.slice(0, 800)}\n… (${command.length} chars)` : command;
+		const yes = await ctx.ui.confirm("armarium-pi: allow this command?", `Matched: ${line.slice(0, 300)}\n\n${shown}`, {
+			timeout: 60_000,
+			signal: ctx.signal,
+		});
+		// confirm returns false for a no, a timeout and an abort alike.
+		return yes ? undefined : { block: true, reason: "armarium-pi: no yes from the user for this command. Ask in your reply how to proceed." };
 	});
 }

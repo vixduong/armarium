@@ -1,13 +1,14 @@
 # Rules
 
 ## Route: the first line of every task
-Write `Flow: <row>` before the first tool call (a question answered in chat needs none), then follow that flow; backticks in that line go only around skills you will load. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix takes at least the Small flow) → Clarify, Ripple, Verify of the Code flow only.
+Write `Flow: <row>` before the first tool call (a chat answer that calls no tool needs none; one that calls tools writes `Flow: answer directly`), then follow that flow; backticks in that line go only around skills you will load. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix takes at least the Small flow) → Clarify, Ripple, Verify of the Code flow only.
 
 A skill is loaded with `read` on its SKILL.md (path in the skills list); that read is the skill call.
 
 | Task | Flow | Lead skill, loaded before the first draft or line of code | Done when (every item true, with evidence) |
 |---|---|---|---|
 | Code: feature, bug, refactor, migration | Code flow | per step 1 | gate command green and it ran the changed tests (skip count stated) · every P0/P1 fixed; a P0 found → the P0-only re-check ran · step 8 reviews ran (Small: skipped) · diff has untrusted input or auth/secrets → the security review ran · each behavior's test seen red before its code (it ran and failed an assertion on the missing behavior; a compile error or a run with no test is not red), else ✗ with the reason · every acceptance check the plan lists ran, else ✗ with the reason |
+| Git: commit, push, merge, rebase, tag | run only the op asked; files outside the request (uncommitted or unrelated), a failing hook, an auth or remote error → stop and ask | none | only the asked op ran, else ✗ with what stopped it · `git status` before and after shown · nothing outside the request staged |
 | Plan or spec only (someone else codes) | Code flow steps 1, 3, 4 | per step 1 | plan names every file, the gate command, and independent acceptance checks · risk area → `reviewer` ran on the plan; one-way door → `oracle` ran, or the approved doc that settles it is cited |
 | UI in a repo: page, component, canvas or WebGL app | Code flow + `~/.pi/agent/rules/frontend.md` | none required; design skills optional per frontend gate | every width and state frontend gate step 4 lists shot and viewed; one missing → ✗ · motion in the diff → `review-animations` ran, Small included |
 | Report, analysis | Deliverable flow | chart → frontend gate item 7 | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated · a `reviewer` call re-derived the headline numbers and claims from the raw data |
@@ -70,7 +71,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 - **Files**: write with `edit`/`write`, never shell redirects; read a big file with `read` `offset`/`limit`.
 - **zsh**: `$cmd` holding "pnpm ci" does not word-split (exit 127); call each command directly or use the repo script.
 - **RTK** (pi extension): every `bash` call, `codemode`'s `tools.bash` included, is rewritten to `rtk <cmd>` and condensed; unfiltered → `rtk proxy <cmd>`. `ctx_execute` and `ctx_batch` run raw. Details: `~/.pi/agent/RTK.md`.
-- **No hooks**: pi runs no Claude Code hooks. Head, tail, cat and shell writes are not blocked, and no Stop check reads your Exit list: the rules above hold because you keep them.
+- **Hooks** (armarium-pi): a tool call before your `Flow:` line is blocked. A destructive or credential command (drop, kill, `rm -r`, force push, `--no-verify`, credential helper) waits for the user's yes; with no UI it is blocked, so ask in the reply. Both are pattern checks on your text and skip foreground subagents: "Ask before destructive" still binds you. Head, tail, cat, shell writes and the Exit list are not checked: those rules hold because you keep them.
 
 ## Subagents
 Main = coordinator: integrates + verifies. Model and thinking per agent live in pi settings `subagents.agentOverrides`.
