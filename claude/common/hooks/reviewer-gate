@@ -6,12 +6,16 @@
 # prompt (REPL write()/edit(), subagents, Bash), each file counted once at its larger figure.
 # shortcut: git counts a file's whole diff against HEAD and skips deletions, so earlier uncommitted edits to a file
 # touched this turn count too; snapshot numstat at UserPromptSubmit if that over-blocks.
+# Also step 8's security branch: a security-only reviewer prompt while `git rev-parse origin/HEAD` resolves in cwd and no
+# `security-review` call → block once, so the agent runs the skill instead of asserting origin/HEAD is missing.
 # Self-test: python3 -I ~/.claude/hooks/test_reviewer_gate.py
 import json, os, re, subprocess, sys
 from datetime import datetime
 
 DOCS = (".md", ".markdown", ".txt", ".rst")
 REVIEW_IN_CODE = re.compile(r"""subagent_type\s*:\s*['"]reviewer['"]|skill\s*:\s*['"](?:[\w-]+:)?code-review['"]""")
+SECURITY = re.compile(r"\bsecurity[- ]only\b", re.I)  # step 8's own phrase for the reviewer that stands in for `security-review`
+SEC_SKILL_IN_CODE = re.compile(r"""skill\s*:\s*['"](?:[\w-]+:)?security-review['"]""")
 
 def lines(s): return len(str(s or "").splitlines())
 
@@ -53,6 +57,7 @@ try:
     if data.get("stop_hook_active"):
         sys.exit(0)
     per_file, flow, reviewed, since = {}, False, False, None
+    sec_reviewer = sec_skill = False  # step 8: `git rev-parse origin/HEAD` succeeds → `security-review`, not a security-only reviewer
     with open(data.get("transcript_path") or "", encoding="utf-8") as f:
         for line in f:
             try:
@@ -67,6 +72,7 @@ try:
                     isinstance(b, dict) and b.get("type") == "tool_result" for b in content))  # list: text + image
                 if typed and not r.get("isMeta") and (r.get("origin") or {}).get("kind", "human") == "human":
                     per_file, flow, reviewed = {}, False, False  # a new prompt starts a new turn
+                    sec_reviewer = sec_skill = False
                     try:
                         since = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00")).timestamp()
                     except (KeyError, ValueError, AttributeError):
@@ -88,23 +94,42 @@ try:
                     per_file[path] = per_file.get(path, 0) + n
                 elif name in ("Agent", "Task") and inp.get("subagent_type") == "reviewer":
                     reviewed = True
+                    sec_reviewer = sec_reviewer or bool(SECURITY.search(str(inp.get("prompt", ""))))
                 elif name == "Skill" and str(inp.get("skill", "")).split(":")[-1] == "code-review":
                     reviewed = True
-                elif REVIEW_IN_CODE.search(str(inp.get("code", ""))):
-                    reviewed = True
+                elif name == "Skill" and str(inp.get("skill", "")).split(":")[-1] == "security-review":
+                    sec_skill = True
+                else:
+                    code = str(inp.get("code", ""))
+                    if REVIEW_IN_CODE.search(code):
+                        reviewed = True
+                        sec_reviewer = sec_reviewer or bool(SECURITY.search(code))
+                    sec_skill = sec_skill or bool(SEC_SKILL_IN_CODE.search(code))
     if flow and not reviewed and since is not None and data.get("cwd"):
         try:
             for path, n in git_changes(data["cwd"], since - 1).items():
                 per_file[path] = max(per_file.get(path, 0), n)
         except (OSError, ValueError, subprocess.SubprocessError):
             pass
+    origin_head = False
+    if sec_reviewer and not sec_skill and data.get("cwd"):
+        try:
+            origin_head = subprocess.run(["git", "-C", data["cwd"], "rev-parse", "--verify", "--quiet", "origin/HEAD"],
+                                         capture_output=True, timeout=3).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            pass
 except Exception:
     sys.exit(0)
 
+reasons = []
 changed = sum(per_file.values())
 if flow and not reviewed and (changed > 200 or len(per_file) > 3):
-    print(json.dumps({"decision": "block", "reason":
-        "This turn changed %d lines in %d files, which is Big (Code flow step 8), but no `reviewer` ran. "
+    reasons.append("This turn changed %d lines in %d files, which is Big (Code flow step 8), but no `reviewer` ran. "
         "Run the `reviewer` agent on the diff now and fix its P0/P1; animation in the diff → also `review-animations`. "
-        "A ✗ in the Exit does not replace the review." % (changed, len(per_file))}))
+        "A ✗ in the Exit does not replace the review." % (changed, len(per_file)))
+if origin_head:
+    reasons.append("A security-only `reviewer` ran, but `git rev-parse origin/HEAD` resolves here, so Code flow step 8 picks "
+        "`security-review`. Call it now, or list it ✗ in the Exit with the error it gave.")
+if reasons:
+    print(json.dumps({"decision": "block", "reason": " ".join(reasons)}))
 sys.exit(0)

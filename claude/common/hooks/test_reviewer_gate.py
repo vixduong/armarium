@@ -95,6 +95,32 @@ with tempfile.TemporaryDirectory() as repo:
     lines_file(os.path.join(repo, "t.js"), 230)
     r = run(REPL_TURN, cwd=repo)
     if not blocked(r): fails += 1; print("FAIL tracked file edited this turn counts via numstat: %s" % (r,))
+# Step 8: a security-only reviewer stands in for `security-review` only when origin/HEAD does not resolve in the cwd.
+def sec_agent(): return {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "reviewer", "prompt": "SECURITY-ONLY review of the diff"}}
+SEC_REPL = repl("await tools.Agent({subagent_type: 'reviewer', prompt: 'SECURITY-ONLY review of x.diff: authorization, IDOR'})")
+def general(p): return {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "reviewer", "prompt": p}}
+with tempfile.TemporaryDirectory() as remote, tempfile.TemporaryDirectory() as plain:
+    for repo in (remote, plain):
+        git(repo, "init", "-q"); git(repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "base")
+    git(remote, "update-ref", "refs/remotes/origin/main", "HEAD"); git(remote, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    SEC_CASES = [  # (name, records, cwd, active, expect_block)
+        ("security-only reviewer although origin/HEAD resolves", [asst(sec_agent()), asst(text("done"))], remote, False, True),
+        ("security-only reviewer from REPL code", [asst(SEC_REPL), asst(text("done"))], remote, False, True),
+        ("security-only reviewer, no origin/HEAD", [asst(sec_agent()), asst(text("done"))], plain, False, False),
+        ("security-review skill also called", [asst(sec_agent(), skill("security-review")), asst(text("done"))], remote, False, False),
+        ("security-review called from REPL code", [asst(sec_agent(), repl("await tools.Skill({skill: 'security-review'})")), asst(text("done"))], remote, False, False),
+        ("general reviewer only", [asst(agent("reviewer")), asst(text("done"))], remote, False, False),
+        ("general reviewer prompt mentions a security review", [asst(general("Review x.diff; a separate security review follows")), asst(text("done"))], remote, False, False),
+        ("general reviewer from REPL mentions a security review", [asst(repl("await tools.Agent({subagent_type: 'reviewer', prompt: 'no security review needed'})")), asst(text("done"))], remote, False, False),
+        ("stop hook already active", [asst(sec_agent())], remote, True, False),
+        ("security reviewer of an earlier turn", [asst(sec_agent()), prompt("next"), asst(text("done"))], remote, False, False),
+    ]
+    for name, records, cwd, active, expect in SEC_CASES:
+        r = run(records, active, cwd=cwd)
+        if r[0] != 0 or blocked(r) != expect:
+            fails += 1; print("FAIL %s: exit=%s out=%s" % (name, r[0], r[1]))
+        elif expect and "`security-review`" not in r[1].get("reason", ""):
+            fails += 1; print("FAIL %s: reason should name security-review: %s" % (name, r[1]))
 LIST_PROMPT = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "next"}, {"type": "image", "source": {}}]}}
 r = run([asst(FLOW, write("/r/index.html", 250)), LIST_PROMPT, asst(FLOW), asst(text("done"))])
 if blocked(r): fails += 1; print("FAIL a prompt with an image starts a new turn: %s" % (r,))

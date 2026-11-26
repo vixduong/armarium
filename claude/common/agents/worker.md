@@ -45,6 +45,7 @@ parent and the user keep decision authority.
 Implemented: what changed and why.
 Changed files: exact paths.
 Validation: exact commands run and their result.
+Red runs: per behavior, the test id, the command, its failing assertion line, and the first code file written after it.
 Open risks/questions: decisions or assumptions still unresolved.
 Next step: what the parent should do next.
 ```

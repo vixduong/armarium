@@ -21,6 +21,7 @@ PRICES = {  # input, output, cache read; cache write = input x 1.25 (5m) or x 2 
     'opus-5-5': (4.0, 20.0, 0.20), 'sonnet-5-5': (2.0, 10.0, 0.10),
     'haiku-5-5': (0.10, 0.50, 0.01), 'fable-5-2': (8.0, 40.0, 0.20),
 }
+UNPRICED = set()  # advisor models already warned about
 PATTERNS = {
     'hook_block': r'BLOCKED:|PreToolUse:\w+ hook error',
     'denied': r'denied by the Claude Code auto mode classifier|denied by your permission settings|matches a deny rule',
@@ -96,8 +97,27 @@ def usage(path):
             parts['output'] += (u.get('output_tokens', 0) or 0) * p[1] / 1e6
             parts['cache_read'] += (u.get('cache_read_input_tokens', 0) or 0) * p[2] / 1e6
             parts['cache_write'] += (w5m * 1.25 + w1h * 2) * p[0] / 1e6
+        # An advisor call bills at its own model and is absent from the top-level usage: in 360 of 360 records (2026-11),
+        # the top-level usage equals the sum of the `message` iterations, so adding `advisor_message` ones counts nothing twice.
+        for it in u.get('iterations') or []:
+            if it.get('type') != 'advisor_message':
+                continue
+            am = short(it.get('model'))
+            models[am] += 1
+            for k in ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'):
+                tot[k] += it.get(k, 0) or 0
+            ap = PRICES.get(am)
+            if not ap:
+                if am not in UNPRICED:
+                    UNPRICED.add(am)
+                    print(f'warning: no price for advisor model {it.get("model")}; its cost is left out', file=sys.stderr)
+            else:
+                a1h = (it.get('cache_creation') or {}).get('ephemeral_1h_input_tokens', 0) or 0
+                a5m = (it.get('cache_creation_input_tokens', 0) or 0) - a1h
+                parts['advisor'] += ((it.get('input_tokens', 0) or 0) * ap[0] + (it.get('output_tokens', 0) or 0) * ap[1]
+                                     + (it.get('cache_read_input_tokens', 0) or 0) * ap[2] + (a5m * 1.25 + a1h * 2) * ap[0]) / 1e6
     return {'requests': len(req), 'models': dict(models), 'tokens': dict(tot), 'usd': round(sum(parts.values()), 2),
-            'usd_parts': {k: round(v, 4) for k, v in parts.items()},
+            'usd_parts': {k: round(v, 4) for k, v in parts.items()}, 'advisor_usd': round(parts['advisor'], 2),
             'ctx0': sizes[0] if sizes else 0, 'peak': max(sizes, default=0), 'repl': repl, 'folds': folds,
             'poll_only': sum(1 for s in tools.values() if s == {'Poll'}), 'plugin_calls': {k: v for k, v in plug.items() if v},
             'span': f'{(first or "")[11:16]}-{(last or "")[11:16]}'}

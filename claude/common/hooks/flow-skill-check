@@ -3,14 +3,56 @@
 # a `Skill` call or a reply listing it as ✗ (CLAUDE.md Exit). A `/skill` command the user typed to start
 # that task counts as the call. Only names that exist under ~/.claude/skills are checked.
 # Only Flow lines after the last user message are checked. Blocks once; stop_hook_active lets the retry through.
-# A turn with a Flow line must also end on a reply holding a ✓ or ✗ line: the Exit's Done-when list.
+# A turn with a Flow line must also end on a reply holding a ✓ or ✗ line: the Exit's Done-when list. A ✓ item (its line
+# and indented sub-bullets) that names an exception blocks: CLAUDE.md Exit makes it ✗. A turn whose cwd repo changed
+# files the frontend gate's `paths:` cover (commits since the prompt, or dirty files touched since) needs `UI` on its Flow line.
 # Self-test: python3 -I ~/.claude/hooks/test_flow_skill_check.py
-import json, os, re, sys
+import json, os, re, subprocess, sys
 
 SKILLS = os.path.expanduser("~/.claude/skills")
 CALL_IN_CODE = re.compile(r"""skill\s*:\s*['"]([\w:.-]+)['"]""")
 SLASH = re.compile(r"\s*(?:<command-message>[^<]*</command-message>\s*)?<command-name>/([\w:.-]+)</command-name>")  # only at the start: notifications quote tags
 NAME = re.compile(r"`([\w.-]+)`")
+EXCEPTION = re.compile(r"(?<!\w)(?:except|but|unless|apart from|(?<!loại )trừ|nhưng)(?!\w)", re.I)  # not "only": the Git row's Done-when says it
+ITEM = re.compile(r"\s*(?:[-*]|\d+\.)?\s*(?:\*\*)?\s*([✓✗])")  # an Exit item starts with its mark; prose may quote one
+EXCLUSIONS = re.compile(r"exclu|loại trừ", re.I)  # the Report row's "exclusions stated" item lists what it excludes
+FRONTEND = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "rules", "frontend.md")  # repo and ~/.claude alike
+
+def excepted(reply):
+    """The ✓ items of an Exit list that name an exception, on their line or in an indented sub-bullet."""
+    item, bad = None, []
+    for ln in reply.splitlines():
+        ln = re.sub(r"`[^`]*`", "", ln)  # code spans hold keywords, not exceptions
+        mark = ITEM.match(ln)
+        if mark:
+            item = ln.strip() if mark.group(1) == "✓" and not EXCLUSIONS.search(ln) else None
+            if item and EXCEPTION.search(ln):
+                bad.append(item)
+        elif item and ln[:1].isspace() and ln.lstrip().startswith(("-", "*")):
+            if EXCEPTION.search(ln) and item not in bad:
+                bad.append(item)
+        else:
+            item = None
+    return bad
+
+def ui_changes(cwd, since):
+    """Files under cwd's repo with a frontend-gate extension, committed or touched (dirty) since `since` (epoch s)."""
+    with open(FRONTEND, encoding="utf-8") as f:
+        m = re.search(r"\{([\w,]+)\}", f.read().split("---")[1])  # paths: "**/*.{tsx,jsx,...}"
+    exts = tuple("." + e for e in m.group(1).split(",")) if m else ()
+    def git(*a): return subprocess.run(["git", "-C", cwd, *a], capture_output=True, timeout=3).stdout.decode("utf-8", "replace")
+    top = git("rev-parse", "--show-toplevel").strip()
+    if not exts or not top:
+        return []
+    names = set(git("-c", "core.quotePath=false", "log", "--since=@%d" % int(since), "--name-only", "--format=").splitlines())
+    recs = iter(git("status", "--porcelain", "-z", "--untracked-files=all").split("\0"))
+    for rec in recs:
+        if rec[:1] in ("R", "C"):
+            next(recs, None)  # -z puts a rename's old path in the next record
+        path = os.path.join(top, rec[3:])
+        if rec[3:] and os.path.isfile(path) and os.path.getmtime(path) >= since:
+            names.add(rec[3:])
+    return sorted(n for n in names if n.lower().endswith(exts))
 
 try:
     data = json.loads(sys.stdin.buffer.read().decode("utf-8"))  # Claude Code sends UTF-8; Windows would decode stdin as cp1252
@@ -36,10 +78,11 @@ try:
                             events.append(("call", str(inp.get("skill", "")).split(":")[-1]))
                         else:
                             events.extend(("call", n.split(":")[-1]) for n in CALL_IN_CODE.findall(str(inp.get("code", ""))))
-            elif r.get("type") == "user" and isinstance(content, str):  # prompts and typed /skills are plain strings; tool results are lists
+            elif r.get("type") == "user" and (isinstance(content, str) or (isinstance(content, list) and not any(
+                    isinstance(b, dict) and b.get("type") == "tool_result" for b in content))):  # a prompt: text, or text + image; tool results are lists
                 if not r.get("isMeta") and (r.get("origin") or {}).get("kind", "human") == "human":  # not hook feedback, not a task notification
-                    events.append(("prompt", None))
-                m = SLASH.match(content)
+                    events.append(("prompt", r.get("timestamp")))  # the turn's start, for the UI-file check
+                m = SLASH.match(content) if isinstance(content, str) else None
                 if m:
                     events.append(("slash", m.group(1).split(":")[-1]))
     last = data.get("last_assistant_message")  # the final reply may not be in the transcript yet
@@ -84,6 +127,23 @@ if isinstance(last, str) and last:
 if any(i > turn for i in flows) and not any(("✓" in ln or "✗" in ln) for ln in final.splitlines() if not ln.lstrip().startswith("Flow:")):
     reasons.append("This turn has a Flow line, but the final reply has no Exit: list the row's Done-when items, "
         "each ✓ with its evidence or ✗ with the reason (CLAUDE.md Exit).")
+if any(i > turn for i in flows):
+    bad = excepted(final)
+    if bad:
+        reasons.append("A ✓ item names an exception (%s); per CLAUDE.md Exit an item with any exception is ✗, "
+            "the exception its reason." % "; ".join('"%s"' % b[:80] for b in bad))
+    turn_flows = [ln for i in flows if i > turn for ln in events[i][1].splitlines() if ln.lstrip().startswith("Flow:")]
+    ui_flow = any(re.search(r"\bUI\b", ln) or re.match(r"\s*Flow:\s*`?Git\b", ln) for ln in turn_flows)  # a Git op commits UI files without building them
+    since = events[turn][1] if turn >= 0 else None
+    if not ui_flow and since and data.get("cwd"):
+        try:
+            from datetime import datetime
+            ui = ui_changes(data["cwd"], datetime.fromisoformat(since.replace("Z", "+00:00")).timestamp() - 1)
+        except Exception:  # a Stop hook never fails the turn: odd front matter or timestamp → skip the check
+            ui = []
+        if ui:
+            reasons.append("This turn changed UI files (%s) but its Flow line has no UI row: add the UI row and its Done-when "
+                "(frontend gate step 4: every width and state, shot and viewed)." % ", ".join(ui[:5]))
 if reasons:
     print(json.dumps({"decision": "block", "reason": " ".join(reasons)}))
 sys.exit(0)

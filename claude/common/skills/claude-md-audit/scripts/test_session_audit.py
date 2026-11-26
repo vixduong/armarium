@@ -39,8 +39,13 @@ rows = [
     asst('r4', 'claude-opus-5-5', 'mcp__codebase-memory-mcp__search_graph', 't4', cr=45000),
 ]
 open(main, 'w').write('\n'.join(json.dumps(r) for r in rows) + '\n')
+advised = asst('s3', 'claude-sonnet-5-5', 'Bash', 'b3', cr=22000)
+advised['message']['usage']['iterations'] = [  # an advisor call: billed at its own model, absent from the top-level usage
+    {'type': 'message', 'cache_read_input_tokens': 22000},
+    {'type': 'advisor_message', 'model': 'claude-opus-5-5', 'input_tokens': 1_000_000, 'output_tokens': 0},
+    {'type': 'advisor_message', 'model': 'claude-unknown-9', 'input_tokens': 5}, {'type': 'advisor_message', 'model': 'claude-unknown-9'}]
 srows = [asst('s1', 'claude-sonnet-5-5', 'Bash', 'b1', cr=20000), result('b1', FOLD),
-         asst('s2', 'claude-sonnet-5-5', 'Bash', 'b2', cr=21000)]
+         asst('s2', 'claude-sonnet-5-5', 'Bash', 'b2', cr=21000), advised]
 open(sub, 'w').write('\n'.join(json.dumps(r) for r in srows) + '\n')
 json.dump({'agentType': 'worker', 'description': 'fix it'}, open(sub[:-6] + '.meta.json', 'w'))
 
@@ -64,6 +69,10 @@ parts = m.get('usd_parts') or {}
 check('cost parts add up', parts and abs(sum(parts.values()) - m.get('usd', -1)) < 0.011, parts)
 check('subagent folds, no plugin calls', s.get('folds') == 1 and s.get('plugin_calls') == {}, (s.get('folds'), s.get('plugin_calls')))
 check('subagent first-request context', s.get('ctx0') == 20000, s.get('ctx0'))
+check('advisor calls priced at their own model', s.get('advisor_usd') == 4.0, s.get('advisor_usd'))
+check('advisor tokens and model are counted', s.get('tokens', {}).get('input_tokens') == 1_000_005 and s.get('models', {}).get('opus-5-5') == 1, (s.get('tokens'), s.get('models')))
+check('an unpriced advisor model is reported once', p.stderr.count('claude-unknown-9') == 1, p.stderr[-300:])
+check('advisor cost counts in the agent total', abs(s.get('usd', 0) - 4.01) < 0.001, s.get('usd'))
 loaded = [f[0] for f in data['main'].get('loaded', [])]
 check('loaded instruction files', '/u/.nvm/CLAUDE.md' in loaded and '/u/.claude/CLAUDE.md' in loaded, loaded)
 hm = data['main'].get('hook_messages', {})

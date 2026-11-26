@@ -181,7 +181,27 @@ Sonnet 5.5 at medium effort built a single-file three.js app (n = 3 per config) 
 | P0-only re-check (Code Done-when, step 8) | No review across 6 runs found a P0, and no run did the re-check | the final replies of the reviewed runs | The re-check runs only after a P0. This replaces the 2026-11-17 wording above |
 | Untrusted input (Code flow) | v2-f1 restored `localStorage` with no validation or cap. Only v2-f3 ran a security review, which found that the restore loop had no upper bound | v2-f1 `index.html:599`, v2-f3 commit `52e7ce9` | Now defined by source and sink, for any stack. It includes browser storage, LLM output, and a loop or allocation sized by the input |
 
+## Changed after the 7f560b1a session audit
+
+Sonnet main with opus workers built two feature slices on the same private Django + React repo (18 commits, $45.72 with advisor calls). Local data: `claude-evals/session-7f560b1a/report.md`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Security branch of step 8 (`hooks/reviewer-gate`) | Main wrote "no `origin/HEAD`" and sent a security-only reviewer prompt twice, without running the check; `origin/HEAD` had resolved since 2026-11-11. Second session with this error (999024f4) | report finding 1; no `rev-parse origin/HEAD` command in any of 24 transcripts | The Stop hook blocks once when a security-only reviewer ran, `origin/HEAD` resolves in cwd, and `security-review` was not called |
+| Exit: an item with any exception is ✗ (`hooks/flow-skill-check`) | Two ✓ for "red before code" carried "trừ trigger và SQL". Third session after the sentence entered Exit (68085871, 999024f4) | report finding 2, main transcript lines 4530 and 5368 | The Stop hook blocks once when a ✓ item, on its line or an indented sub-bullet, holds except/but/unless/apart from/trừ/nhưng/chưa. "only" is left out: the Git row's Done-when says it |
+| Red-run evidence (`agents/worker.md` Output format) | Main copied the worker's summary into its ✓; Part A had models, a migration and `average_data.py` written before their tests | worker a670192a, 14:25:02 to 14:27:18 | Workers report each behavior's red run: test id, command, failing assertion, first code file written after it |
+| UI row for UI files (`hooks/flow-skill-check`) | Both slices with a page wrote only "Code flow", so no Done-when asked for loading and long-content states. Second session with missing states (4f71e73c) | report finding 3; screenshots read by workers a7a7aa0e, acb4ae5a, abeed048 | The Stop hook blocks once when files matching `rules/frontend.md` `paths:` were committed since the prompt, or are dirty and touched since, and the Flow line has no `UI` |
+| Advisor cost (`skills/claude-md-audit/scripts/session_audit.py`) | The script reported $34.97; 19 advisor calls sit in `usage.iterations[]` and cost $10.74 more | the audit's reviewer re-derived the total from raw usage | Each `advisor_message` iteration is priced at its own model and counted in its agent's total and the cost mix |
+
 ## Still open
+
+- From the 7f560b1a audit, one session each; re-check them alongside later evals:
+  - Main said "I start items 1 and 2 now" and ended the turn. One prompt held a git op plus three tasks and got only `Flow: Git`. Candidate Done-when line: "a reply that says work continues ends with that work started".
+  - 9 of 10 workers got a per-call `opus` with no "Raise when" cell for it ($28.12 with advisor, 62%); every opus slice still drew P1s. A reviewer ran on its sonnet default over opus-written commits, which `agent-no-downgrade` cannot see. Candidates: a worker "Raise when" cell, and a reviewer-below-author check.
+  - The Exit Stop hook also blocks a turn that only waits for a background agent (L4525), which forced an Exit on unfinished work. Candidate: skip a turn whose last `Agent` call is still running.
+  - 60 of 188 main requests were Poll-only ($1.63, 26% of main) against 5 to 6% in review-20261123. Candidate line in `## Subagents` Wait: in Code Mode, end the turn while a background agent runs.
+  - Concurrent pytest runs on one test database deadlocked 4 times. Fix lives in the schools repo (`flock` around `backend-check` and `backend-test`), not here.
+  - A local command such as `/reload-plugins` starts a new turn for `flow-skill-check` and `reviewer-gate`, so a task's Exit after it goes unchecked (line 4535 of 7f560b1a).
 
 - `explorer`, `tester` and `evidence-auditor` also show 0 calls. `explorer` stays, because it is meant to keep code search cheap; the reason it is never picked is not known yet.
 - The cost of the full config: about 1.2× (backend task) to 1.6× (UI task) the bare cost in run 2, down from 1.9× in run 1.
