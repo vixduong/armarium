@@ -179,6 +179,10 @@ case("--repo-only still fails a dead bare .md pointer", 1, "enforcement.md", arg
 # every hook a settings file calls is described in that OS's README
 case("unix settings call a hook README.md does not name", 1, "README.md does not name",
      files={"README.md": "Hooks: `skill-model-invocable`.\n"})
+case("docs/hooks.md is the hook page when it exists: a hook only README.md names fails", 1, "docs/hooks.md does not name",
+     files={"README.md": "Hooks: `good-hook`, `skill-model-invocable`.\n", "docs/hooks.md": "Hooks: `skill-model-invocable`.\n"})
+case("docs/hooks.md names every hook: passes", 0, "check: ok",
+     files={"README.md": "See docs.\n", "docs/hooks.md": "Hooks: `good-hook`, `skill-model-invocable`.\n"})
 case("README.md names every hook the unix settings call", 0, "check: ok",
      files={"README.md": "Hooks: `good-hook`, `skill-model-invocable`.\n"})
 WIN_HOOK = json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python C:/Users/YOU/.claude/hooks/good-hook"}]}]}})

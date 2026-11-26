@@ -80,9 +80,9 @@ h = setup()
 with open(os.path.join(h, ".local", "bin", "codebase-memory-mcp"), "w") as f:
     f.write("#!/bin/sh\ncat >/dev/null\nsleep 20\nprintf '%s' '" + GRAPH.replace("'", "") + "'\n")
 os.chmod(os.path.join(h, ".local", "bin", "codebase-memory-mcp"), 0o755)
-t0 = time.time()
+t0 = time.monotonic()  # a clock that stops while the machine sleeps
 p = subprocess.run([HOOK], input=json.dumps({"cwd": "/repo/x"}), capture_output=True, text=True, env={"HOME": h, "PATH": os.environ["PATH"], "CBM_HOOK_TIMEOUT": "1"})
-check("hung binary: cut off", p.returncode == 0 and p.stdout == "" and time.time() - t0 < 10, "%r %.1f s" % (p.stdout[:40], time.time() - t0))
+check("hung binary: cut off", p.returncode == 0 and p.stdout == "" and time.monotonic() - t0 < 10, "%r %.1f s" % (p.stdout[:40], time.monotonic() - t0))
 check("hung binary: nothing cached", cached(h) == [], str(cached(h)))
 
 # a cache dir that cannot be made: the graph still prints, and no shell error reaches the session

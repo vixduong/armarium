@@ -96,8 +96,8 @@ class Home:
 
 
 def wait_for(cond, secs=15):
-    end = time.time() + secs
-    while time.time() < end:
+    end = time.monotonic() + secs  # monotonic: a laptop that naps mid-test does not eat the budget
+    while time.monotonic() < end:
         if cond():
             return True
         time.sleep(0.1)
@@ -196,11 +196,11 @@ h = Home()
 h.sleep(9)
 if NT:  # a taskkill.exe in the project dir must not run: the real one comes from System32
     shutil.copy(sys.executable, os.path.join(h.home, "taskkill.exe"))
-t0 = time.time()
+t0 = time.monotonic()  # elapsed time on a clock that stops while the machine sleeps
 rc, out = h.run()
-took = time.time() - t0
+took = time.monotonic() - t0
 check("hung binary: returns in time, silent", rc == 0 and out == "" and took < 10 and h.cached() is None, (rc, out, round(took, 1)))
-time.sleep(max(0, t0 + 10.5 - time.time()))  # the cut-off stub would have finished at about 9 s; the refresh runs until about 17 s
+time.sleep(max(0, t0 + 10.5 - time.monotonic()))  # the cut-off stub would have finished at about 9 s; the refresh runs until about 17 s
 check("hung binary: the whole process tree is stopped (a .cmd shim's child too)", not h.done())
 check("hung binary: background refresh warms the cache", wait_for(lambda: h.cached() == GRAPH, 20), h.cached())
 
@@ -215,14 +215,14 @@ open(h.cache_file() + ".lock", "w").close()
 saved = {k: os.environ.get(k) for k in ("USERPROFILE", "HOME")}
 os.environ.update(USERPROFILE=h.home, HOME=h.home)
 hook_mod.LOCK_SECONDS = 8
-t0 = time.time()
+t0 = time.monotonic()
 try:
     hook_mod.refresh(h.stub, json.dumps({"cwd": CWD}).encode())
 finally:
     for k, v in saved.items():
         if v is None: os.environ.pop(k, None)
         else: os.environ[k] = v
-took = time.time() - t0
+took = time.monotonic() - t0
 check("refresh: cut off at LOCK_SECONDS - 5, cache kept, lock cleared", took < 5 and h.cached() == OLD and not os.path.exists(h.cache_file() + ".lock"), round(took, 1))
 
 # importing run_cli_hook leaves no __pycache__ beside the hook (install.ps1 would copy it)

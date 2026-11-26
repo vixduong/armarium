@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Which commands does a hook edit judge differently? bin/hook-diff [--hook PATH] [--ref REV] [--all] [CORPUS | -]
+Runs every row of the corpus through the hook as committed at REV (default HEAD) and as it is in the work tree, and
+prints the rows whose exit code changed (0 allow, 2 block, anything else a hook error, which Claude Code lets through).
+Corpus: JSON lines, each ["agent_type or empty", "command"]; # starts a comment; - reads the rows from stdin, so a
+reviewer can probe many commands in one call. Default: bin/hook-corpus.jsonl and claude/common/hooks/bash-ban-shell-writes.
+Only the hook and path_only.py are taken from REV: a hook that reads other files of its folder is compared without them.
+It reports and exits 0; exit 2 only when it cannot run. Run it before a review of a gate, and add the rows a review tried.
+Self-test: python3 -I bin/test_hook_diff.py"""
+import argparse, json, os, subprocess, sys, tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+ap.add_argument("--repo", default=os.path.dirname(HERE))
+ap.add_argument("--hook", default="claude/common/hooks/bash-ban-shell-writes", help="path inside the repo")
+ap.add_argument("--ref", default="HEAD")
+ap.add_argument("--all", action="store_true", help="print every row, changed or not")
+ap.add_argument("corpus", nargs="?", default=os.path.join(HERE, "hook-corpus.jsonl"))
+args = ap.parse_args()
+
+
+def fail(msg):
+    sys.stderr.write("hook-diff: %s\n" % msg)
+    sys.exit(2)
+
+
+try:
+    text = sys.stdin.read() if args.corpus == "-" else open(args.corpus, encoding="utf-8").read()
+except OSError as e:
+    fail("cannot read the corpus: %s" % e)
+rows = []
+for n, line in enumerate(text.splitlines(), 1):
+    if not line.strip() or line.lstrip().startswith("#"):
+        continue
+    try:
+        pair = json.loads(line)
+    except ValueError:
+        pair = None
+    if not (isinstance(pair, list) and len(pair) == 2 and all(isinstance(x, str) for x in pair)):
+        fail("line %d is not [agent, command]: %s" % (n, line[:80]))
+    rows.append(tuple(pair))
+
+new = os.path.join(args.repo, args.hook)
+if not os.path.isfile(new):
+    fail("no hook at %s" % new)
+keep = tempfile.TemporaryDirectory()  # removed when the script ends
+old_dir = keep.name
+old = os.path.join(old_dir, os.path.basename(args.hook))
+for name in (os.path.basename(args.hook), "path_only.py"):  # the hook, and the module some hooks import from their own folder
+    p = subprocess.run(["git", "-C", args.repo, "show", "%s:%s/%s" % (args.ref, os.path.dirname(args.hook), name)], capture_output=True)
+    if p.returncode == 0:
+        with open(os.path.join(old_dir, name), "wb") as f:
+            f.write(p.stdout)
+if not os.path.isfile(old):
+    fail("%s has no %s" % (args.ref, args.hook))
+
+
+def verdict(hook, agent, command):
+    data = {"tool_name": "Bash", "tool_input": {"command": command}}
+    if agent:
+        data["agent_type"] = agent
+    try:
+        return subprocess.run([sys.executable, hook], input=json.dumps(data), capture_output=True, text=True, timeout=20).returncode
+    except subprocess.TimeoutExpired:
+        return "timeout"
+
+
+changed = 0
+for agent, command in rows:
+    before, after = verdict(old, agent, command), verdict(new, agent, command)
+    changed += before != after
+    if args.all or before != after:
+        shown = command.replace("\n", "\\n")
+        print("%s -> %s  [%s] %s%s" % (before, after, agent, shown[:150] + ("..." if len(shown) > 150 else ""),
+                                     "" if after in (0, 2) else "  (hook error: the call would go through)"))
+print("%d commands, %d changed (%s against the work tree)" % (len(rows), changed, args.ref))

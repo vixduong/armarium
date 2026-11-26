@@ -11,7 +11,8 @@ Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows
 - Exec: a claude/windows/ hook or a Python hook in claude/common/hooks/ never starts a bare program name (Windows searches
   the cwd, the user's project, first).
   Reads list/tuple argv, also as the left side of +; os.system, shell=True strings and argv held in a variable are not read.
-- Docs: every hook a settings.example.json calls is named in that OS's README (README.md, claude/windows/README.md).
+- Docs: every hook a settings.example.json calls is named in that OS's hook page (docs/hooks.md, or README.md where
+  there is none; claude/windows/README.md).
 - Drops: ALLOWED_DROPS in hooks/agent-no-downgrade equals the "<tier> /" entries of agent-tuning.md's "Drop when" column.
 - pi (warnings only): ~/.pi/agent/settings.json exists but its packages do not include this repo's pi/, or its
   subagents.agentOverrides differ from pi/settings.example.json.
@@ -209,7 +210,8 @@ for md in [os.path.join(CLAUDE, "CLAUDE.md")] + glob.glob(os.path.join(CLAUDE, "
                                 % (rel(md), name, full))
 
 # Docs: a hook the settings call but the README never names is a hook nobody was told about (skipped where the README is absent)
-for f, readme in ((UNIX_SETTINGS, "README.md"), (WINDOWS_SETTINGS, "claude/windows/README.md")):
+for f, readme in ((UNIX_SETTINGS, "docs/hooks.md" if os.path.exists(os.path.join(REPO, "docs", "hooks.md")) else "README.md"),
+                  (WINDOWS_SETTINGS, "claude/windows/README.md")):
     if f not in settings or not os.path.exists(os.path.join(REPO, readme)):
         continue
     with open(os.path.join(REPO, readme), encoding="utf-8") as fh:
