@@ -26,6 +26,40 @@ BLOCK = [
     "printf x &> out.py",
     "sed -n p src.py \\>| tee dst.py",  # an escaped > is a word, so this | is a pipe
     "cat <<< \"x\"\nsed -i 's/a/b/' f",  # a here-string opens no heredoc body
+    # found by a pi review session, 2026-11-27: one wrapper or one quote was enough to pass
+    "'cat' > f",
+    "\"echo\" x > f",
+    "(echo x > f)",
+    "{ echo x > f; }",
+    "sudo echo x > f",
+    "nice -n 5 printf x > f",
+    "if true; then echo x > f; fi",
+    "true & echo x > f",
+    "x=$(echo y > f)",
+    "ls `echo y > f`",
+    "echo \"it's\" > f; echo 'x'",          # an apostrophe inside double quotes is text
+    "echo '<<X'\necho x > f",               # << inside quotes opens no heredoc
+    "echo x \\\n> f",                       # backslash-newline joins the lines
+    "bash -c \"echo x > f\"",
+    "sh -c 'cd /tmp && printf x > f'",
+    "eval 'echo x > f'",
+    "bash <<EOF\necho x > f\nEOF",          # a heredoc fed to a shell is commands, not data
+    "cat <<EOF | sh\necho x > f\nEOF",
+    "echo 'sed -i s/a/b/ f' | bash",
+    "touch /tmp/bash-raw-unlock-$PPID",      # the unlock file is the user's to create
+    "ls > /tmp/bash-raw-unlock-1",
+    "git diff --output=/tmp/bash-raw-unlock-1",
+    "git init -q /tmp/bash-raw-unlock-1",
+    "sed -n 'w /tmp/bash-raw-unlock-1' /dev/null",
+    "touch /tmp/bash-raw-unl\\ock-$PPID",   # a backslash or a quote inside the name still names it
+    "touch /tmp/bash-raw-'un'lock-1",
+    "git -c alias.x='!touch /tmp/bash-raw-unlock-1' x",
+    "echo \"$(date) > x\" >> log.txt",       # the redirect after a $( ) belongs to the outer command
+    "echo \"## $(date)\" >> notes.md",
+    # found by the security review of the lexer, 2026-11-27
+    "# don't\necho hi > f",                 # an apostrophe in a comment opens no quote
+    "echo $'a\\'' > f",                    # $'..' takes \' inside
+    "echo hi > f; : " + "$(" * 1000,          # too deep to parse is blocked, not waved through
 ]
 ALLOW = [
     "ls -la",
@@ -44,6 +78,25 @@ ALLOW = [
     "claude -p \"$Q\" < /dev/null > out.jsonl 2>&1",
     "cat <<< \"x\"",
     "make check &> /tmp/check.log",
+    "git commit -q -m \"$(cat <<'EOF'\nfix: say \"x\" > y, it's done\necho x > f\nEOF\n)\"",  # the usual commit form: quotes and > in the body are text
+    "git commit -m \"it's > done; echo x > f\"",
+    "echo \"a > b\"",
+    "bash -c 'cd x && make check'",
+    "bash run.sh",
+    "sleep 5 & wait",
+    "make check 2>&1 &",
+    "(cd x && make check > /tmp/check.log 2>&1)",
+    "sudo make install",
+    "git grep -n bash-raw-unlock",
+    "grep -rn 'bash-raw-unlock' claude",
+    "echo \"$(date) > x\"",
+    "echo \"built $(git rev-parse --short HEAD)\" && make check > /tmp/check.log 2>&1",
+    "ls # it's fine",
+    "echo a#b > /dev/null",
+    "echo $'a\\nb'",
+    "echo ${#x} $# '#'",
+    "ls -la /tmp/bash-raw-unlock-1",
+    "echo \"$(date)\"",
     "echo hi 1>&2",
     "",
 ]
@@ -104,5 +157,14 @@ for a, c in RO_ALLOW:
     if run(c, a) != 0: fails += 1; print("SHOULD ALLOW for", a, repr(c))
 nb = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_name": "Read", "tool_input": {}}), capture_output=True, text=True).returncode
 if nb != 0: fails += 1; print("non-Bash tool should pass")
-print("FAILS", fails, "of", len(BLOCK) + 2 * len(ALLOW) + len(VARIANTS) + len(RO_BLOCK) + len(RO_ALLOW) + 1)
+# The user's unlock file (keyed on the hook's parent, this test) opens the write rules, but never the rule about the file itself.
+unlock = os.path.join(os.environ.get("TEMP") or "/tmp" if os.name == "nt" else "/tmp", "bash-raw-unlock-%d" % os.getpid())
+open(unlock, "w").close()
+try:
+    if run("echo x > f") != 0: fails += 1; print("unlocked: a write should pass")
+    if run("touch " + unlock) != 2: fails += 1; print("unlocked: touching the unlock file should still be blocked")
+    if run("echo x > f", "reviewer") != 2: fails += 1; print("unlocked: a read-only agent stays blocked")
+finally:
+    os.remove(unlock)
+print("FAILS", fails, "of", len(BLOCK) + 2 * len(ALLOW) + len(VARIANTS) + len(RO_BLOCK) + len(RO_ALLOW) + 4)
 sys.exit(1 if fails else 0)

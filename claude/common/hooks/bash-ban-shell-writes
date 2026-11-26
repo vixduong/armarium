@@ -5,8 +5,10 @@
 # sed -i, perl -i, tee, a python script fed on stdin). CLAUDE.md: write files with Edit/Write only.
 # Added 2026-11-15: eval run 2 (docs/rule-origins.md in armarium) measured 5/8 compliance with the prose rule and 0 blocks by any hook.
 # Allowed on purpose: heredoc into a command (git commit -F -), log redirects (make check > log 2>&1),
-# fd redirects, /dev/null. Escape hatch (same file as bash-ban-raw-tools): touch /tmp/bash-raw-unlock-$PPID,
-# on Windows %TEMP%\bash-raw-unlock-<parent pid>.
+# fd redirects, /dev/null. Escape hatch for the user (same file as bash-ban-raw-tools): touch /tmp/bash-raw-unlock-$PPID,
+# on Windows %TEMP%\bash-raw-unlock-<parent pid>, from a terminal of their own: a command that names the file is blocked here.
+# shortcut: a pattern check on the command text, so a variable, a glob, a script file or another language gets past it;
+# it catches the habit, not an agent that works at evading it. Upgrade to a sandbox if one is seen doing that.
 # Self-test: python3 -I ~/.claude/hooks/test_bash_ban_shell_writes.py
 import json, os, re, sys, time
 
@@ -20,34 +22,126 @@ if data.get("tool_name") != "Bash":
 # their only write path, so no file write is allowed, log redirects and the unlock file included.
 READ_ONLY = {"reviewer", "oracle"}
 agent = data.get("agent_type") or ""
-unlock = os.path.join(os.environ.get("TEMP") or "/tmp" if os.name == "nt" else "/tmp", "bash-raw-unlock-%d" % os.getppid())
-try:
-    if agent not in READ_ONLY and 0 <= time.time() - os.stat(unlock).st_mtime < 600:
-        sys.exit(0)
-except OSError:
-    pass
+UNLOCK_NAME = "bash-raw-unlock"
+unlock = os.path.join(os.environ.get("TEMP") or "/tmp" if os.name == "nt" else "/tmp", "%s-%d" % (UNLOCK_NAME, os.getppid()))
 
 cmd = (data.get("tool_input") or {}).get("command") or ""
+PLAIN = re.compile(r"[^A-Za-z0-9._/-]")
+HEREDOC = re.compile(r"""<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|\\?([\w.-]+))""")
 
-# Drop heredoc bodies: their text is data, not shell.
-kept, delim = [], None
-for line in cmd.split("\n"):
-    if delim is not None:
-        if line.strip() == delim:
-            delim = None
-        continue
-    kept.append(line)
-    m = re.search(r"(?<!<)<<(?!<)-?\s*['\"]?(\w+)['\"]?", line)  # not a here-string (<<<): it has no body
-    if m:
-        delim = m.group(1)
-text = "\n".join(kept)
-# Quoted strings are data too (commit messages, sed scripts).
-text = re.sub(r"'[^']*'", "''", text)
-text = re.sub(r'"[^"]*"', '""', text)
-text = re.sub(r"(?<!\\)>\|", ">", text)  # noclobber override: the same write, and its | is no pipe
+
+def lex(s):
+    """(text, quoted, bodies, subs). text: the command with every quoted string reduced to a harmless word and its quote
+    marks dropped ('cat' is still cat; a quoted > or << is data), escaped characters neutralised and heredoc bodies cut out.
+    subs: the code inside each $( ) and backtick pair, lexed the same way and kept apart, so the outer command keeps its
+    own redirects. quoted and bodies hold the raw strings, for a command that feeds a shell."""
+    out, quoted, bodies, subs, pending, n = [], [], [], [], [], len(s)
+
+    def sub(i, closer, level):
+        nonlocal out
+        outer, out = out, []
+        i = code(i, closer, level + 1)
+        subs.append("".join(out).replace(">|", ">"))
+        out = outer
+        out.append("_sub_")
+        return i
+
+    def cut_bodies(i):  # i: just past a newline, with heredocs open
+        while pending:
+            delim, body = pending.pop(0), []
+            while i < n:
+                j = s.find("\n", i)
+                j = n if j < 0 else j
+                line, i = s[i:j], min(j + 1, n)
+                if line.strip() == delim:
+                    break
+                body.append(line)
+            bodies.append("\n".join(body))
+        return i
+
+    def code(i, closer, level=0):  # shell text up to closer: ")" of a $( ), a backtick, or None for the whole command
+        if level > 40:
+            raise ValueError("nested too deep")
+        depth = 0
+        while i < n:
+            c = s[i]
+            if c == "#" and s[i - 1:i] in ("", " ", "\t", "\n", ";", "&", "|", "("):  # a comment: text up to the newline
+                j = s.find("\n", i)
+                i = n if j < 0 else j
+            elif s.startswith("$'", i):  # ANSI-C quotes: \' does not end them
+                j = i + 2
+                while j < n and s[j] != "'":
+                    j += 2 if s[j] == "\\" else 1
+                quoted.append(s[i + 2:j])
+                out.append(PLAIN.sub("_", s[i + 2:j]))
+                i = j + 1
+            elif c == "\\":
+                if s[i + 1:i + 2] != "\n":  # backslash-newline joins two lines; any other escaped character is text
+                    out.append("_")
+                i += 2
+            elif c == "'":
+                j = s.find("'", i + 1)
+                j = n if j < 0 else j
+                quoted.append(s[i + 1:j])
+                out.append(PLAIN.sub("_", s[i + 1:j]))
+                i = j + 1
+            elif c == '"':
+                i = double(i + 1, level)
+            elif c == "`":
+                if closer == "`":
+                    return i + 1
+                i = sub(i + 1, "`", level)
+            elif s.startswith("$(", i):
+                i = sub(i + 2, ")", level)
+            elif c == ")" and closer == ")" and depth == 0:
+                return i + 1
+            elif c in "()":
+                depth += 1 if c == "(" else -1
+                out.append(c)
+                i += 1
+            elif s.startswith("<<", i) and not s.startswith("<<<", i) and s[i - 1:i] != "<":  # <<< is a here-string: no body
+                m = HEREDOC.match(s, i)
+                if m:
+                    pending.append(m.group(2) or m.group(3) or m.group(4) or "")
+                out.append("<<")
+                i = m.end() if m else i + 2
+            elif c == "\n":
+                out.append(c)
+                i = cut_bodies(i + 1)
+            else:
+                out.append(c)
+                i += 1
+        return i
+
+    def double(i, level):  # inside "...": text, except $( ) and backticks, which are code
+        start, buf = i, []
+        while i < n and s[i] != '"':
+            if s[i] == "\\":
+                buf.append("_")
+                i += 2
+            elif s.startswith("$(", i) or s[i] == "`":
+                out.append(PLAIN.sub("_", "".join(buf)))
+                buf = []
+                i = sub(i + 2, ")", level) if s[i] == "$" else sub(i + 1, "`", level)
+            else:
+                buf.append(s[i])
+                i += 1
+        out.append(PLAIN.sub("_", "".join(buf)))
+        quoted.append(s[start:i])
+        return i + 1
+
+    code(0, None)
+    return "".join(out).replace(">|", ">"), quoted, bodies, subs  # >| (noclobber override) is the same write, and its | is no pipe
+
 
 SAFE = {"/dev/null", "/dev/stderr", "/dev/stdout"}
 WRITERS = {"echo", "printf", "cat"}
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "eval"}  # their quoted arguments and heredocs are commands
+KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until", "!", "time"}
+WRAPPERS = {"rtk", "proxy", "command", "builtin", "env", "sudo", "doas", "nice", "nohup", "exec", "xargs"}  # shortcut: an option with a word for its value (sudo -u x) hides the command
+READERS = {"grep", "rg", "ls", "stat", "cat", "head", "tail", "wc"}  # may name the unlock file without making it
+GIT_READS = {"grep", "log", "show", "blame"}
+UNLOCK = "the unlock file"
 
 
 def file_targets(seg):
@@ -68,46 +162,82 @@ def git_sub(args):
 
 
 def words(seg):
-    w = seg.split()
-    while w and (re.match(r"^\w+=", w[0]) or w[0] in ("rtk", "proxy", "command", "builtin", "env")):
+    w = seg.lstrip(" \t({").split()  # a subshell or a group starts a command like any other
+    while w and (re.match(r"^\w+=", w[0]) or w[0] in KEYWORDS or w[0] in WRAPPERS):
+        wrapper = w[0] in WRAPPERS
         w = w[1:]
+        while wrapper and w and (w[0].startswith("-") or w[0].isdigit()):  # nice -n 5, xargs -n 1
+            w = w[1:]
     return w
 
 
-reason = None
-for seg in re.split(r"\|\||&&|;|\||\n", text):
-    w = words(seg)
-    if not w:
-        continue
-    head = os.path.basename(w[0])
-    targets = file_targets(seg)
-    heredoc = "<<" in seg
-    if agent in READ_ONLY:
-        # also fd redirects into a file (2> f, &> f); 2>&1 and 2>/dev/null stay allowed
-        targets += [t for t in re.findall(r"(?:[0-9]|&)>>?\s*([^\s&|;<>]+)", seg) if t not in SAFE]
-    if agent in READ_ONLY and targets:
-        reason = "'> %s'" % targets[0]
-    elif agent in READ_ONLY and head in ("mkdir", "rm", "rmdir", "mv", "cp", "touch"):
-        reason = "'%s'" % head
-    elif agent in READ_ONLY and head == "git" and git_sub(w[1:]) in GIT_WRITES:
-        reason = "'git %s'" % git_sub(w[1:])
-    elif head in WRITERS and targets:
-        reason = "'%s > %s'" % (head, targets[0])
-    elif heredoc and targets:
-        reason = "heredoc into '%s'" % targets[0]
-    elif head in ("sed", "gsed") and any(re.match(r"^-[A-Za-z]*i", a) or a.startswith("--in-place") for a in w[1:]):
-        reason = "'sed -i'"
-    elif head == "perl" and any(re.match(r"^-[A-Za-z]*i", a) for a in w[1:]):
-        reason = "'perl -i'"
-    elif head == "tee" and any(a not in SAFE and not a.startswith("-") for a in w[1:]):
-        reason = "'tee'"
-    elif re.match(r"^python[0-9.]*$", head) and ("-" in w[1:] or heredoc):
-        reason = "a python script on stdin"
-    if reason:
-        break
+def check(command, depth=0):
+    """Why the command writes a file, or None."""
+    text, quoted, bodies, subs = lex(command)
+    nested, seen = [], False
+    named = UNLOCK_NAME in re.sub(r"""[\\'"]""", "", command)  # the name with a backslash or a quote inside it is still the name
+    segments = [seg for part in [text] + subs for seg in re.split(r"\|\||&&|;|\||\n|(?<![>&])&(?![>&])", part)]  # a lone & ends a command; &> and >& are redirects
+    for seg in segments:
+        w = words(seg)
+        if not w:
+            continue
+        head = os.path.basename(w[0])
+        targets = file_targets(seg)
+        heredoc = "<<" in seg
+        if UNLOCK_NAME in seg:
+            seen = True
+            reads = head in READERS or (head == "git" and git_sub(w[1:]) in GIT_READS and not any(a.startswith("--output") for a in w))
+            if not reads or any(UNLOCK_NAME in t for t in re.findall(r">\s*([^\s|;&<>]+)", seg)):
+                return UNLOCK
+        if agent in READ_ONLY:
+            # also fd redirects into a file (2> f, &> f); 2>&1 and 2>/dev/null stay allowed
+            targets += [t for t in re.findall(r"(?:[0-9]|&)>>?\s*([^\s&|;<>]+)", seg) if t not in SAFE]
+        if agent in READ_ONLY and targets:
+            return "'> %s'" % targets[0]
+        if agent in READ_ONLY and head in ("mkdir", "rm", "rmdir", "mv", "cp", "touch"):
+            return "'%s'" % head
+        if agent in READ_ONLY and head == "git" and git_sub(w[1:]) in GIT_WRITES:
+            return "'git %s'" % git_sub(w[1:])
+        if head in WRITERS and targets:
+            return "'%s > %s'" % (head, targets[0])
+        if heredoc and targets:
+            return "heredoc into '%s'" % targets[0]
+        if head in ("sed", "gsed") and any(re.match(r"^-[A-Za-z]*i", a) or a.startswith("--in-place") for a in w[1:]):
+            return "'sed -i'"
+        if head == "perl" and any(re.match(r"^-[A-Za-z]*i", a) for a in w[1:]):
+            return "'perl -i'"
+        if head == "tee" and any(a not in SAFE and not a.startswith("-") for a in w[1:]):
+            return "'tee'"
+        if re.match(r"^python[0-9.]*$", head) and ("-" in w[1:] or heredoc):
+            return "a python script on stdin"
+        if head in SHELLS:
+            # shortcut: every quoted string and heredoc of a command that runs a shell is read as code, so a commit
+            # message beside `bash -c` in one command can block; split the command if that happens.
+            nested = quoted + bodies
+    if named and not seen:
+        return UNLOCK
+    for inner in nested if depth < 3 else []:
+        reason = check(inner, depth + 1)
+        if reason:
+            return reason
+    return None
 
+
+try:
+    reason = check(cmd)
+except Exception:  # a command this parser cannot read is not waved through: the old line-by-line check never failed
+    reason = "a command this hook cannot parse (nested too deep?)"
 if not reason:
     sys.exit(0)
+if reason == UNLOCK:
+    sys.stderr.write("BLOCKED: this command names the unlock file. Only the user creates it, from a terminal of their own. "
+                     "Ask the user in your reply if the block is in the way.\n")
+    sys.exit(2)
+try:  # the user's unlock opens the write rules for 10 minutes; a future mtime (clock skew, forged) counts as expired
+    if agent not in READ_ONLY and 0 <= time.time() - os.stat(unlock).st_mtime < 600:
+        sys.exit(0)
+except OSError:
+    pass
 if agent in READ_ONLY:
     sys.stderr.write(
         "BLOCKED: %s writes a file, and %s is read-only. Read long output in slices with "
