@@ -62,6 +62,11 @@ const shellWrite = (command: string): string | undefined => {
 	return r.status === 2 ? r.stderr.trim().replace(/^BLOCKED:\s*/, "") : undefined;
 };
 
+// A second copy of this extension in one process (another path to the package, or -e beside it) must not repeat an effect.
+// The last tool call the user said yes to, shared by every copy, so the second copy does not ask again.
+const APPROVED = Symbol.for("armarium-pi.approved-tool-call");
+const globals = globalThis as Record<symbol, unknown>;
+
 // pi-subagents' required-child-extension registry (src/shared/required-child-extensions.js): every child of a registered
 // session loads these files whatever its agent settings say, and a load failure aborts the launch instead of running ungated.
 // shortcut: written straight into the versioned global registry so this package needs no pi-subagents dependency;
@@ -109,6 +114,7 @@ export default function (pi: ExtensionAPI) {
 		if (`${o.customPrompt ?? ""}${o.appendSystemPrompt ?? ""}`.includes("<active_agent ")) return;
 		gated = true;
 		// Global rules go first so a project AGENTS.md after them can override, as pi orders a global file.
+		if (o.contextFiles.some((f) => f.path === path)) return; // another copy added the rules
 		o.contextFiles.unshift({ path, content: readFileSync(path, "utf8").replaceAll("~/.pi/agent/", () => shared) });
 	});
 
@@ -160,6 +166,7 @@ export default function (pi: ExtensionAPI) {
 		if (!gated || !needsExit || exitAsked || event.outcome !== "completed") return;
 		if (lastText.split("\n").some((l) => /[✓✗]/.test(l) && !FLOW_LINE.test(l))) return;
 		exitAsked = true;
+		if (event.entries.some((e) => (e as { customType?: string }).customType === "armarium-exit")) return; // another copy asked
 		const content =
 			"armarium-pi: this run has a `Flow:` line, but the final reply has no Exit list. Reply again and list the row's " +
 			"Done-when items, each ✓ with its evidence or ✗ with the reason (AGENTS.md Exit).";
@@ -192,6 +199,7 @@ export default function (pi: ExtensionAPI) {
 			"Stop and ask the user in your reply. A subagent has no user here, and a supervisor's yes does not open this check: " +
 			"report the command as blocked in your final answer.";
 		if (!ctx.hasUI) return { block: true, reason };
+		if (globals[APPROVED] === event.toolCallId) return; // another copy asked about this call and got a yes
 		// The match goes first so padding cannot push the risky part out of the dialog.
 		const shown = command.length > 800 ? `${command.slice(0, 800)}\n… (${command.length} chars)` : command;
 		const yes = await ctx.ui.confirm("armarium-pi: allow this command?", `Matched: ${line.slice(0, 300)}\n\n${shown}`, {
@@ -199,6 +207,7 @@ export default function (pi: ExtensionAPI) {
 			signal: ctx.signal,
 		});
 		// confirm returns false for a no, a timeout and an abort alike.
+		if (yes) globals[APPROVED] = event.toolCallId;
 		return yes ? undefined : { block: true, reason: "armarium-pi: no yes from the user for this command. Ask in your reply how to proceed." };
 	});
 }

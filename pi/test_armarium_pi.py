@@ -17,14 +17,18 @@ if not shutil.which("node"):
 #   {"ev": "preset", "key": str, "entries": [...]}                    -> registry (another host registered first)
 DRIVER = """
 const ext = (await import(process.argv[1])).default;
-const handlers = {};
+const handlers = {}, second = {};
 ext({ on: (name, fn) => { handlers[name] = fn; } });
+ext({ on: (name, fn) => { second[name] = fn; } });  // a second copy in the same session; steps with "twice" reach both, in pi's order
+let step = 0;
 const out = [];
 const REG = Symbol.for("pi-subagents.required-child-extensions.v1");
 const reg = () => Object.fromEntries(globalThis[REG]?.bySession ?? []);
 const presets = {};
 let session = { getSessionFile: () => undefined, getSessionId: () => "none" };
 for (const s of JSON.parse(process.argv[2])) {
+  const copies = s.twice ? [handlers, second] : [handlers];
+  step++;
   if (s.ev === "preset") {
     globalThis[REG] ??= { version: 1, bySession: new Map() };
     presets[s.key] = Object.freeze(s.entries);
@@ -41,27 +45,37 @@ for (const s of JSON.parse(process.argv[2])) {
     process.argv = [...argv, ...(s.argv ?? [])];
     const event = { messageType: s.type ?? "user", systemPrompt: "", systemPromptOptions: { appendSystemPrompt: "", ...s.opts,
       contextFiles: [{ path: "/proj/AGENTS.md", content: "project rules" }] } };
-    await handlers.before_agent_start(event, { sessionManager: session });
+    for (const h of copies) await h.before_agent_start(event, { sessionManager: session });
     if (s.reg) { out.push(reg()); process.argv = argv; continue; }
     process.argv = argv;
     out.push(event.systemPromptOptions.contextFiles);
   } else if (s.ev === "settle") {
-    const r = await handlers.agent_before_settle?.({ type: "agent_before_settle", entries: s.entries ?? [], continue: false,
-      outcome: s.outcome ?? "completed", context: {} }, { sessionManager: session });
-    out.push(r ?? null);
+    let entries = s.entries ?? [], go = false, any = false;  // pi's emitBoundary: each handler sees what the ones before it returned
+    for (const h of copies) {
+      const r = await h.agent_before_settle?.({ type: "agent_before_settle", entries, continue: go,
+        outcome: s.outcome ?? "completed", context: {} }, { sessionManager: session });
+      if (r) any = true;
+      if (r?.entries !== undefined) entries = r.entries;
+      if (r?.continue !== undefined) go = r.continue;
+    }
+    out.push(any ? { entries, continue: go } : null);
   } else if (s.ev === "msg") {
     const content = [];
     if (s.thinking) content.push({ type: "thinking", thinking: s.thinking });
     if (s.text) content.push({ type: "text", text: s.text });
     for (let i = 0; i < (s.calls ?? 0); i++) content.push({ type: "toolCall", id: "t" + i, name: "read", arguments: {} });
-    await handlers.message_end({ type: "message_end", message: { role: "assistant", content } }, {});
+    for (const h of copies) await h.message_end({ type: "message_end", message: { role: "assistant", content } }, {});
     out.push(null);
   } else {
     const asked = [];
     const ctx = { hasUI: !!s.ui, signal: undefined, ui: { confirm: async (t, m, o) => { asked.push({ m, timeout: o?.timeout }); return !!s.yes; } } };
     ctx.sessionManager = session;
-    const r = await handlers.tool_call({ type: "tool_call", toolName: s.tool, toolCallId: "t", input: s.input,
-      ...(s.parent ? { parentToolCallId: s.parent } : {}) }, ctx);
+    let r;  // pi's emitToolCall: the first block ends the chain
+    for (const h of copies) {
+      r = (await h.tool_call({ type: "tool_call", toolName: s.tool, toolCallId: "t" + step, input: s.input,
+        ...(s.parent ? { parentToolCallId: s.parent } : {}) }, ctx)) ?? r;
+      if (r?.block) break;
+    }
     out.push({ result: r ?? null, asked });
   }
 }
@@ -228,6 +242,19 @@ r = run([{"ev": "start", **SKIPS["subagent, appended prompt"]}, WORK, said("done
 check("a subagent run gets no Exit reminder", r[3] is None, r[3])
 r = run([START, WORK, said("done"), SETTLE, START, WORK, said("done"), SETTLE])
 check("a new user prompt is checked again", nudged(r[3]) and nudged(r[7]), [r[3], r[7]])
+
+# --- loaded twice in one session (a second path to the same package, or -e beside it): each effect happens once ---
+def twice(s): return dict(s, twice=True)
+r = run([twice(START)])
+check("loaded twice: the rules are added once", [f["path"] for f in r[0] or []] == [rules["path"], PROJECT["path"]], [f["path"] for f in r[0] or []])
+r = run([twice(START), twice(WORK), twice(said("done")), twice(SETTLE)])
+got = [e for e in (r[3] or {}).get("entries", []) if e.get("customType") == "armarium-exit"]
+check("loaded twice: one Exit reminder", len(got) == 1 and nudged(r[3]), r[3])
+r = run([twice(START), twice(FLOW), twice(bash("kill 1", ui=True, yes=True)), twice(bash("kill 1", ui=True, yes=False))])
+check("loaded twice: the user is asked once, and a yes runs the command", len((r[2] or {}).get("asked", [])) == 1 and not blocked(r[2]), r[2])
+check("loaded twice: a yes covers that one call only", len((r[3] or {}).get("asked", [])) == 1 and blocked(r[3]), r[3])
+r = run([twice(START), twice(READ)])
+check("loaded twice: the Flow gate still blocks", blocked(r[1]), r[1])
 
 # --- every pi-subagents child of this session must load this extension ---
 # requireForAllRunners: pi-subagents then refuses machine and external-CLI launches and keeps the snapshot with the run.
