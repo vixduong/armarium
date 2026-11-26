@@ -58,12 +58,12 @@ fails = total = 0
 
 def case(label, want_rc, want_text, **kw):
     global fails, total
-    pre, args = kw.pop("pre", None), kw.pop("args", ())
+    pre, args, absent = kw.pop("pre", None), kw.pop("args", ()), kw.pop("absent", None)
     repo, home = fixture(**kw)
     if pre:
         pre(repo)
     rc, out = run(repo, home, args)
-    ok = rc == want_rc and (want_text in out)
+    ok = rc == want_rc and (want_text in out) and (absent is None or absent not in out)
     total += 1
     fails += not ok
     print(("ok   " if ok else "FAIL ") + label, "" if ok else "rc=%s %s" % (rc, out[-300:]))
@@ -195,6 +195,18 @@ case("ALLOWED_DROPS lists a drop agent-tuning.md does not", 1, "oracle",
      files={"claude/common/hooks/agent-no-downgrade": DROPS_HOOK, "claude/common/agent-tuning.md": TUNING % "sonnet / high"})
 case("ALLOWED_DROPS matches the Drop when column", 0, "check: ok",
      files={"claude/common/hooks/agent-no-downgrade": DROPS_HOOK, "claude/common/agent-tuning.md": TUNING % "opus / high, else sonnet / high,"})
+
+# a machine that runs pi (~/.pi/agent/settings.json) without this repo's pi package has none of armarium-pi's gates: warn, never fail
+PI_PKG = {"pi/package.json": "{}"}
+def pi_settings(packages): return {".pi/agent/settings.json": json.dumps({"packages": packages})}
+case("pi settings without this repo's pi package: a warning, exit 0", 0, "WARN pi", files=PI_PKG, home_files=pi_settings(["npm:pi-subagents"]))
+case("the warning names the install command", 0, "pi install", files=PI_PKG, home_files=pi_settings([]))
+case("pi settings list this repo's pi package: no warning", 0, "check: ok", absent="WARN", files=PI_PKG,
+     home_files=pi_settings(["npm:pi-subagents", "{HOME}/../repo/pi"]))
+case("the package listed as {source}: no warning", 0, "check: ok", absent="WARN", files=PI_PKG,
+     home_files=pi_settings([{"source": "{HOME}/../repo/pi", "skills": []}]))
+case("no pi on this machine: no warning", 0, "check: ok", absent="WARN", files=PI_PKG)
+case("--repo-only: no warning", 0, "check: ok", absent="WARN", args=["--repo-only"], files=PI_PKG, home_files=pi_settings([]))
 
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

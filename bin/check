@@ -12,6 +12,7 @@ Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows
   Reads list/tuple argv, also as the left side of +; os.system, shell=True strings and argv held in a variable are not read.
 - Docs: every hook a settings.example.json calls is named in that OS's README (README.md, claude/windows/README.md).
 - Drops: ALLOWED_DROPS in hooks/agent-no-downgrade equals the "<tier> /" entries of agent-tuning.md's "Drop when" column.
+- pi (warning only): ~/.pi/agent/settings.json exists but its packages do not include this repo's pi/.
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
   unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
 Self-test: python3 -I bin/test_check.py"""
@@ -234,6 +235,19 @@ for py in glob.glob(os.path.join(WINDOWS, "**", "*.py"), recursive=True) + glob.
             if isinstance(head, ast.Constant) and isinstance(head.value, str) and not ntpath.isabs(head.value):  # Windows rules on every OS
                 problems.append("%s:%d runs bare %r: Windows searches the cwd (the user's project) first; use resolve(), path_only.which() or a full path"
                                 % (rel(py), node.lineno, head.value))
+
+# pi: a machine that runs pi (~/.pi/agent/settings.json) without this repo's package runs none of armarium-pi's gates.
+# A warning, not a problem: it is this machine's state, not the repo's.
+pi_pkg, pi_settings = os.path.join(REPO, "pi"), os.path.join(os.path.expanduser("~/.pi/agent"), "settings.json")
+if not REPO_ONLY and os.path.isfile(os.path.join(pi_pkg, "package.json")) and os.path.isfile(pi_settings):
+    try:
+        with open(pi_settings, encoding="utf-8") as fh:
+            packages = json.load(fh).get("packages", [])
+    except (OSError, ValueError):
+        packages = []
+    sources = [p.get("source", "") if isinstance(p, dict) else str(p) for p in packages]
+    if not any(os.path.realpath(os.path.expanduser(s)) == os.path.realpath(pi_pkg) for s in sources):
+        print("WARN pi on this machine does not load %s, so no pi run has armarium-pi's gates: run `pi install %s`" % (rel(pi_pkg), pi_pkg))
 
 for p in problems:
     print("FAIL " + p)
