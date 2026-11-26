@@ -138,7 +138,9 @@ SAFE = {"/dev/null", "/dev/stderr", "/dev/stdout"}
 WRITERS = {"echo", "printf", "cat"}
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "eval"}  # their quoted arguments and heredocs are commands
 KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until", "!", "time"}
-WRAPPERS = {"rtk", "proxy", "command", "builtin", "env", "sudo", "doas", "nice", "nohup", "exec", "xargs"}  # shortcut: an option with a word for its value (sudo -u x) hides the command
+WRAPPERS = {"rtk", "proxy", "command", "builtin", "env", "sudo", "doas", "nice", "nohup", "exec", "xargs"}
+VALUE_OPTS = {"sudo": "ugUhpCDRTr", "doas": "u", "env": "uCS", "nice": "n", "xargs": "nILPdEs", "exec": "a"}  # short options whose next word is their value
+CLOSERS = {"}", "done", "fi", "esac"}  # a redirect after one of these covers the whole group or loop
 READERS = {"grep", "rg", "ls", "stat", "cat", "head", "tail", "wc"}  # may name the unlock file without making it
 GIT_READS = {"grep", "log", "show", "blame"}
 UNLOCK = "the unlock file"
@@ -150,7 +152,10 @@ def file_targets(seg):
 
 
 GIT_WRITES = {"checkout", "switch", "stash", "commit", "reset", "add", "rm", "mv", "merge", "rebase", "push",
-              "pull", "cherry-pick", "revert", "restore", "clean", "apply", "am"}
+              "pull", "cherry-pick", "revert", "restore", "clean", "apply", "am", "update-ref", "init", "clone"}
+BRANCH_WRITES = {"-D", "-d", "-m", "-M", "-c", "-C", "-f", "-u", "--delete", "--move", "--copy", "--force", "--set-upstream-to", "--unset-upstream", "--edit-description"}
+LISTING = ("-l", "--list", "-a", "--all", "-r", "--remotes", "--contains", "--no-contains", "--merged", "--no-merged", "--points-at", "--show-current", "-v", "-vv", "--sort", "--format", "-n")
+CONFIG_WRITES = {"--add", "--unset", "--unset-all", "--replace-all", "--rename-section", "--remove-section", "-e", "--edit"}
 
 
 def git_sub(args):
@@ -161,29 +166,71 @@ def git_sub(args):
     return args[i] if i < len(args) else ""
 
 
+def git_write(args):
+    """The git subcommand when it changes the repo or writes a file, else ''. For the read-only agents."""
+    sub = git_sub(args)
+    rest = args[args.index(sub) + 1:] if sub in args else []
+    flags, plain = [a for a in rest if a.startswith("-")], [a for a in rest if not a.startswith("-")]
+    if any(a.startswith("--output") for a in args):
+        return sub + " --output"
+    listing = any(f.split("=")[0] in LISTING for f in flags)  # git branch --sort=.., git tag --contains HEAD: these list
+    takes = sum(f in ("--contains", "--no-contains", "--merged", "--no-merged", "--points-at", "-n") for f in flags)  # each may take one name
+    listing = listing and (len(plain) <= takes or bool({"-l", "--list"} & set(flags)))  # a name beyond those is a ref to create
+    if sub == "stash":
+        return "" if plain[:1] in (["list"], ["show"]) else sub
+    if sub == "apply":
+        return "" if {"--check", "--stat", "--numstat", "--summary"} & set(flags) and "--apply" not in flags else sub
+    if (sub in GIT_WRITES or sub in ("format-patch", "bundle", "gc", "prune", "repack", "fetch")
+            or (sub == "archive" and any(f == "-o" or f.startswith("--output") for f in flags))
+            or (sub == "worktree" and plain[:1] != ["list"])
+            or (sub == "tag" and plain and not listing)
+            or (sub == "branch" and (BRANCH_WRITES & set(flags) or (plain and not listing)))
+            or (sub == "config" and (len(plain) >= 2 or CONFIG_WRITES & set(flags)))
+            or (sub == "remote" and plain and plain[0] not in ("show", "get-url"))):
+        return sub
+    return ""
+
+
 def words(seg):
     w = seg.lstrip(" \t({").split()  # a subshell or a group starts a command like any other
     while w and (re.match(r"^\w+=", w[0]) or w[0] in KEYWORDS or w[0] in WRAPPERS):
-        wrapper = w[0] in WRAPPERS
+        wrapper = w[0] if w[0] in WRAPPERS else None
         w = w[1:]
-        while wrapper and w and (w[0].startswith("-") or w[0].isdigit()):  # nice -n 5, xargs -n 1
-            w = w[1:]
+        while wrapper and w and w[0].startswith("-"):
+            takes_value = len(w[0]) == 2 and w[0][1] in VALUE_OPTS.get(wrapper, "")  # sudo -u root, xargs -I {}
+            w = w[2:] if takes_value else w[1:]
     return w
 
 
 def check(command, depth=0):
     """Why the command writes a file, or None."""
     text, quoted, bodies, subs = lex(command)
-    nested, seen = [], False
+    nested, seen, wrote = [], False, False
     named = UNLOCK_NAME in re.sub(r"""[\\'"]""", "", command)  # the name with a backslash or a quote inside it is still the name
-    segments = [seg for part in [text] + subs for seg in re.split(r"\|\||&&|;|\||\n|(?<![>&])&(?![>&])", part)]  # a lone & ends a command; &> and >& are redirects
-    for seg in segments:
+    segments = []  # (text, closes): closes marks what follows a ) that ends a subshell or a case pattern
+    for part in [text] + subs:
+        part = re.sub(r"\[\[.*?\]\]", " ", part, flags=re.S)  # [[ a > b ]] compares; what follows the ]] is checked as usual
+        for seg in re.split(r"\|\||&&|;|\||\n|(?<![>&])&(?![>&])", part):  # a lone & ends a command; &> and >& are redirects
+            level, cut = 0, None
+            for i, c in enumerate(seg):
+                level += (c == "(") - (c == ")")
+                if level < 0:
+                    cut = i
+                    break
+            segments += [(seg, False)] if cut is None else [(seg[:cut], False), (seg[cut + 1:], True)]
+    for seg, closes in segments:
+        if seg.lstrip()[:1] in ("{", "(") or seg.split()[:1] in (["do"], ["then"], ["for"], ["while"], ["until"], ["if"], ["case"]):
+            wrote = False  # a new group or loop: an echo before it is not in it
         w = words(seg)
+        targets = file_targets(seg)
+        if closes and targets and wrote:  # (echo x; true) > f
+            return "a group of echo/printf/cat > '%s'" % targets[0]
         if not w:
             continue
-        head = os.path.basename(w[0])
-        targets = file_targets(seg)
-        heredoc = "<<" in seg
+        head = os.path.basename(re.split(r"[<>)]", w[0])[0])  # done>f, (echo)>f: the word ends at the redirect or the )
+        heredoc = bool(re.search(r"(?<!<)<<(?!<)", seg))
+        args = [a for i, a in enumerate(w[1:]) if not a.startswith("<<<") and w[i] != "<<<"]  # without a here-string and its word
+        script_on_stdin = "-" in args or heredoc or ("<<<" in seg and not [a for a in args if not a.startswith("-")])
         if UNLOCK_NAME in seg:
             seen = True
             reads = head in READERS or (head == "git" and git_sub(w[1:]) in GIT_READS and not any(a.startswith("--output") for a in w))
@@ -194,12 +241,20 @@ def check(command, depth=0):
             targets += [t for t in re.findall(r"(?:[0-9]|&)>>?\s*([^\s&|;<>]+)", seg) if t not in SAFE]
         if agent in READ_ONLY and targets:
             return "'> %s'" % targets[0]
-        if agent in READ_ONLY and head in ("mkdir", "rm", "rmdir", "mv", "cp", "touch"):
+        if agent in READ_ONLY and (head in ("mkdir", "rm", "rmdir", "mv", "cp", "touch", "ln", "dd", "install", "truncate", "chmod", "chown", "patch", "unzip", "wget")
+                                   or (head == "curl" and any(a.startswith(("--output", "--remote-name")) or re.match(r"^-[a-zA-Z]*[oO]", a) for a in w[1:]))
+                                   or (head in ("tar", "bsdtar", "gtar") and (re.match(r"^[a-zA-Z]*[xcru]", (w[1:2] or [""])[0]) or any(
+                                       a in ("--extract", "--get", "--create", "--append", "--update") or re.match(r"^-[a-zA-Z]*[xcru]", a) for a in w[1:])))):
             return "'%s'" % head
-        if agent in READ_ONLY and head == "git" and git_sub(w[1:]) in GIT_WRITES:
-            return "'git %s'" % git_sub(w[1:])
+        if agent in READ_ONLY and head == "git" and git_write(w[1:]):
+            return "'git %s'" % git_write(w[1:])
+        if agent in READ_ONLY and head == "find" and any(a in ("-delete", "-exec", "-execdir", "-ok", "-okdir") or a.startswith(("-fprint", "-fls")) for a in w[1:]):
+            return "'find' with an action"
         if head in WRITERS and targets:
             return "'%s > %s'" % (head, targets[0])
+        wrote = wrote or head in WRITERS
+        if head in CLOSERS and targets and wrote:  # { echo x; } > f, for ..; do echo ..; done > f
+            return "a group of echo/printf/cat > '%s'" % targets[0]
         if heredoc and targets:
             return "heredoc into '%s'" % targets[0]
         if head in ("sed", "gsed") and any(re.match(r"^-[A-Za-z]*i", a) or a.startswith("--in-place") for a in w[1:]):
@@ -208,7 +263,7 @@ def check(command, depth=0):
             return "'perl -i'"
         if head == "tee" and any(a not in SAFE and not a.startswith("-") for a in w[1:]):
             return "'tee'"
-        if re.match(r"^python[0-9.]*$", head) and ("-" in w[1:] or heredoc):
+        if re.match(r"^python[0-9.]*$", head) and script_on_stdin:
             return "a python script on stdin"
         if head in SHELLS:
             # shortcut: every quoted string and heredoc of a command that runs a shell is read as code, so a commit
@@ -234,7 +289,7 @@ if reason == UNLOCK:
                      "Ask the user in your reply if the block is in the way.\n")
     sys.exit(2)
 try:  # the user's unlock opens the write rules for 10 minutes; a future mtime (clock skew, forged) counts as expired
-    if agent not in READ_ONLY and 0 <= time.time() - os.stat(unlock).st_mtime < 600:
+    if agent not in READ_ONLY and os.path.isfile(unlock) and 0 <= time.time() - os.stat(unlock).st_mtime < 600:
         sys.exit(0)
 except OSError:
     pass

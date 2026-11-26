@@ -17,12 +17,12 @@ def check(name, ok):
     print(("ok   " if ok else "FAIL ") + name)
 
 
-def setup():
+def setup(name="repo"):
     root = os.path.realpath(tempfile.mkdtemp())  # macOS: /var is a link to /private/var, and git prints the real path
-    home, repo = os.path.join(root, "home"), os.path.join(root, "repo")
+    home, repo = os.path.join(root, "home"), os.path.join(root, name)
     os.makedirs(home); os.makedirs(repo)
     subprocess.run(["git", "-C", repo, "init", "-q"], check=True)
-    proj = os.path.join(home, ".claude", "projects", re.sub(r"[/.]", "-", repo))
+    proj = os.path.join(home, ".claude", "projects", re.sub(r"[/. ]", "-", repo))  # Claude Code turns a space into - too (seen: Application-Support)
     return home, repo, os.path.join(proj, "memory"), os.path.join(repo, ".claude", "memory")
 
 
@@ -64,6 +64,11 @@ check("same name in the repo: repo file kept", read(os.path.join(rm, "a.md")) ==
 check("same name in the repo: other files moved", read(os.path.join(rm, "b.md")) == "b")
 check("same name in the repo: real dir kept with the file left behind",
       not os.path.islink(pm) and os.path.isfile(os.path.join(pm, "a.md")) and read(os.path.join(pm, "a.md")) == "session")
+
+home, repo, pm, rm = setup("my repo")
+os.makedirs(os.path.dirname(pm))
+check("a space in the repo path: exit 0", run(home, repo) == 0)
+check("a space in the repo path: linked under the slug Claude Code uses", os.path.islink(pm) and os.path.realpath(pm) == rm)
 
 print("FAILS", fails)
 sys.exit(1 if fails else 0)

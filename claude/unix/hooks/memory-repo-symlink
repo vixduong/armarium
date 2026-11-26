@@ -12,8 +12,8 @@ repo_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
 common="$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
 [ "${common##*/}" = ".git" ] && repo_root="${common%/.git}"
 
-# Encode path the way Claude Code does: / and . become -
-slug="$(printf '%s' "$repo_root" | sed 's|[/.]|-|g')"
+# Encode path the way Claude Code does: /, . and a space become - (as the Windows port does)
+slug="$(printf '%s' "$repo_root" | sed 's|[/. ]|-|g')"
 projects_memory="$HOME/.claude/projects/${slug}/memory"
 # For the ~/.claude config repo itself, store at <root>/memory (no nested .claude).
 if [ "$repo_root" = "$HOME/.claude" ]; then

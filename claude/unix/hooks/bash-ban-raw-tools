@@ -34,7 +34,7 @@ CMD=$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")
 TRIMMED=$(echo "$CMD" | sed -E 's/^[[:space:]]*//')
 
 # Match only first token (command head, unwrapped). Allow `rtk <tool>` wrappers.
-FIRST=$(echo "$TRIMMED" | awk '{print $1}')
+FIRST=$(echo "$TRIMMED" | awk 'NF {print $1; exit}')  # the first word of the first non-blank line, not one per line
 
 banned=0
 case "$FIRST" in

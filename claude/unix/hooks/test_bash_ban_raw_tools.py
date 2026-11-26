@@ -29,5 +29,7 @@ check("grep x f | head-foo", 0)  # not head: a different command
 check("grep x f | headx", 0)
 check("grep x f | head_x", 0)
 check("cat f", 0)
+check("git log | head -5\ncat notes.txt", 0)  # the first line decides: a later line starting with cat is not the pipe's source
+check("\n  grep x f | head -5", 2)           # blank lines before the command do not hide it
 shutil.rmtree(home, ignore_errors=True)
 sys.exit(1 if fails else 0)

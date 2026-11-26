@@ -18,7 +18,17 @@ if [ -n "$cwd" ] && [ -s "$f" ] && [[ $(<"$f") == *additionalContext* ]] && [ "$
   cat "$f"
   exit 0
 fi
-out=$(printf '%s' "$INPUT" | "$BIN" hook-augment 2>/dev/null)
+# A hung binary must not hold the session start (macOS ships no `timeout`): perl runs it in its own process group
+# and kills the group after 7 s, as the Windows port does, so a child that keeps the pipe open goes too.
+# Without perl the binary runs unbounded, as before.
+limit=${CBM_HOOK_TIMEOUT:-7}
+case "$limit" in ''|*[!0-9]*|0) limit=7 ;; esac  # alarm 0 would mean no limit
+if command -v perl >/dev/null 2>&1; then
+  out=$(printf '%s' "$INPUT" | perl -e 'my $t = shift; my $p = fork; if (!$p) { setpgrp(0, 0); exec @ARGV; exit 127 }
+    $SIG{ALRM} = sub { kill "KILL", -$p; exit 0 }; alarm $t; waitpid $p, 0' "$limit" "$BIN" hook-augment 2>/dev/null)
+else
+  out=$(printf '%s' "$INPUT" | "$BIN" hook-augment 2>/dev/null)
+fi
 printf '%s' "$out"
 if [ -n "$cwd" ] && [[ $out == *additionalContext* ]]; then mkdir -p "$C" && printf '%s' "$out" > "$f.$$" && mv -f "$f.$$" "$f"; fi 2>/dev/null  # rename: a parallel session never reads half a file
 exit 0

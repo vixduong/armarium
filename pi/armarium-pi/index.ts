@@ -5,7 +5,7 @@
 // Self-test: python3 -I pi/test_armarium_pi.py
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { delimiter, dirname, isAbsolute, join } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -54,10 +54,10 @@ const onPath = (names: string[]): string | undefined => {
 		for (const name of names) if (isAbsolute(dir) && existsSync(join(dir, name))) return join(dir, name);
 };
 // The hook's reason when it blocks (exit 2). No python, a timeout or any other exit lets the command through, as the hook itself fails open.
-const shellWrite = (command: string): string | undefined => {
+const shellWrite = (command: string, agent?: string): string | undefined => {
 	const python = onPath(process.platform === "win32" ? ["python.exe", "python3.exe"] : ["python3", "python"]);
 	if (!python) return;
-	const input = JSON.stringify({ tool_name: "Bash", tool_input: { command } });
+	const input = JSON.stringify({ tool_name: "Bash", tool_input: { command }, ...(agent ? { agent_type: agent } : {}) }); // reviewer, oracle: read-only rules
 	const r = spawnSync(python, [WRITES_HOOK], { input, encoding: "utf8", timeout: 5000 });
 	return r.status === 2 ? r.stderr.trim().replace(/^BLOCKED:\s*/, "") : undefined;
 };
@@ -66,6 +66,17 @@ const shellWrite = (command: string): string | undefined => {
 // The last tool call the user said yes to, shared by every copy, so the second copy does not ask again.
 const APPROVED = Symbol.for("armarium-pi.approved-tool-call");
 const globals = globalThis as Record<symbol, unknown>;
+
+// A path inside a .git directory: by its text (any case: macOS and Windows disks ignore it) or by where its folder really is.
+const IN_GIT = /(^|[\\/])\.git([\\/]|$)/i;
+const inGit = (p: string): boolean => {
+	if (IN_GIT.test(p)) return true;
+	try {
+		return IN_GIT.test(realpathSync(dirname(resolve(p))) + "/"); // a symlink that leads into .git
+	} catch {
+		return false; // the folder is not there yet: nothing to follow
+	}
+};
 
 // pi-subagents' required-child-extension registry (src/shared/required-child-extensions.js): every child of a registered
 // session loads these files whatever its agent settings say, and a load failure aborts the launch instead of running ungated.
@@ -99,6 +110,7 @@ export default function (pi: ExtensionAPI) {
 	let exitAsked = false;
 	let lastText = ""; // text of the latest assistant message: the final reply when the run settles
 	let approvedHere: string | undefined; // the tool call this copy got a yes for
+	let agent: string | undefined; // the pi-subagents agent this session runs as, if any
 
 	// contextFiles is rebuilt for each run, so read on each run: an edit to AGENTS.md is live without /reload.
 	pi.on("before_agent_start", (event, ctx) => {
@@ -111,6 +123,7 @@ export default function (pi: ExtensionAPI) {
 		// Same reach as a global ~/.pi/agent/AGENTS.md: off under --no-context-files, and pi-subagents children
 		// (tagged <active_agent .../>) get no global context by default.
 		gated = false;
+		agent = /<active_agent name="([\w-]+)"/.exec(`${o.customPrompt ?? ""}${o.appendSystemPrompt ?? ""}`)?.[1];
 		if (process.argv.includes("--no-context-files") || process.argv.includes("-nc")) return;
 		if (`${o.customPrompt ?? ""}${o.appendSystemPrompt ?? ""}`.includes("<active_agent ")) return;
 		gated = true;
@@ -150,6 +163,12 @@ export default function (pi: ExtensionAPI) {
 	});
 	pi.on("session_shutdown", unregister);
 
+	// A user message that arrives while a run is going (steer, follow-up) starts no new run, so before_agent_start does not
+	// fire for it. Its reply still owes an Exit list: allow the reminder once more.
+	pi.on("input", (event) => {
+		if (event.source !== "extension" && event.streamingBehavior) exitAsked = false;
+	});
+
 	pi.on("message_end", (event) => {
 		const m = event.message as { role?: string; content?: unknown };
 		if (m.role !== "assistant" || !Array.isArray(m.content)) return;
@@ -184,13 +203,15 @@ export default function (pi: ExtensionAPI) {
 					"then call tools. A chat answer that calls tools writes `Flow: answer directly`.",
 			};
 		}
-		if (!SHELL_TOOLS.has(event.toolName)) return;
-		const input = event.input as { command?: unknown; commands?: unknown; code?: unknown };
+		const input = event.input as { command?: unknown; commands?: unknown; code?: unknown; path?: unknown };
+		// write and edit into a .git directory (config with a credential helper, hooks that run on commit) ask like a risky command
+		const gitFile = (event.toolName === "write" || event.toolName === "edit") && typeof input.path === "string" && inGit(input.path);
+		if (!SHELL_TOOLS.has(event.toolName) && !gitFile) return;
 		// bash only: ctx_execute code may be Python or JS, where > is a comparison.
-		const write = event.toolName === "bash" && typeof input.command === "string" ? shellWrite(input.command) : undefined;
+		const write = event.toolName === "bash" && typeof input.command === "string" ? shellWrite(input.command, agent) : undefined;
 		if (write) return { block: true, reason: `armarium-pi: ${write} In pi those tools are \`write\` and \`edit\`.` };
-		const command = strings([input.command, input.commands, input.code]).join("\n");
-		const hit = RISKY.map((p) => command.match(p)).find(Boolean);
+		const command = gitFile ? `${event.toolName} ${input.path}` : strings([input.command, input.commands, input.code]).join("\n");
+		const hit = gitFile ? command.match(/^.*$/s) : RISKY.map((p) => command.match(p)).find(Boolean);
 		if (!hit) return;
 		const start = Math.max(command.lastIndexOf("\n", hit.index ?? 0) + 1, (hit.index ?? 0) - 40);
 		const end = command.indexOf("\n", (hit.index ?? 0) + hit[0].length);

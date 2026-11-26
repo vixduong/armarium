@@ -1,3 +1,8 @@
 #!/bin/sh
 # Runs the repo gate before each commit. Enable once per clone: git config core.hooksPath .githooks
-exec "$(git rev-parse --show-toplevel)/bin/check"
+# python3, or python where that is the only name that runs (Windows: python3 can be the Store stub).
+for py in python3 python; do
+  "$py" -c "" 2>/dev/null && exec "$py" "$(git rev-parse --show-toplevel)/bin/check"
+done
+echo "pre-commit: no python3 or python that runs" >&2
+exit 1

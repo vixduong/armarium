@@ -11,6 +11,7 @@ if not shutil.which("node"):
 # argv[2] = JSON list of steps, run in order against one extension instance; prints one result per step.
 #   {"ev": "start", "type": "user"|"custom", "argv": [...], "opts": {...}} -> contextFiles after before_agent_start
 #   {"ev": "msg", "text": "...", "thinking": "...", "calls": n}            -> null (assistant message_end with n tool calls)
+#   {"ev": "input", "behavior": "steer"|"followUp", "source": "interactive"|"extension"} -> null (a user message during a run)
 #   {"ev": "settle", "outcome": "completed"|"aborted"|"error", "entries": [...]} -> agent_before_settle result
 #   {"ev": "tool", "tool": "bash", "input": {...}, "ui": bool, "yes": bool} -> tool_call result
 #   {"ev": "session_start", "file": str|null, "id": str} / {"ev": "session_shutdown"} -> pi-subagents required-extension registry
@@ -51,6 +52,9 @@ for (const s of JSON.parse(process.argv[2])) {
     if (s.reg) { out.push(reg()); process.argv = argv; continue; }
     process.argv = argv;
     out.push(event.systemPromptOptions.contextFiles);
+  } else if (s.ev === "input") {
+    for (const h of copies) await h.input?.({ type: "input", text: s.text ?? "more", source: s.source ?? "interactive", streamingBehavior: s.behavior }, { sessionManager: session });
+    out.push(null);
   } else if (s.ev === "settle") {
     let entries = s.entries ?? [], go = false, any = false;  // pi's emitBoundary: each handler sees what the ones before it returned
     for (const h of copies) {
@@ -96,7 +100,12 @@ def run(steps, path=None, second=None):
     """path: the PATH the extension sees (node itself is started by full path). second: another path to index.ts for the second copy."""
     argv = [shutil.which("node"), "--no-warnings", "--input-type=module"] + (["--preserve-symlinks"] if second else [])
     argv += ["-e", DRIVER, pathlib.Path(EXT).as_uri(), json.dumps(steps)] + ([pathlib.Path(second).as_uri()] if second else [])
-    p = subprocess.run(argv, capture_output=True, encoding="utf-8", cwd=HERE, env=None if path is None else dict(os.environ, PATH=path))
+    try:
+        p = subprocess.run(argv, capture_output=True, encoding="utf-8", cwd=HERE, timeout=120,
+                           env=None if path is None else dict(os.environ, PATH=path))
+    except subprocess.TimeoutExpired:  # a handler that never resolves
+        check("driver finishes within 120 s", False)
+        return [None] * len(steps)
     if p.returncode:
         check("driver runs", False, p.stderr[-1500:])
         return [None] * len(steps)
@@ -247,6 +256,45 @@ r = run([{"ev": "start", **SKIPS["subagent, appended prompt"]}, WORK, said("done
 check("a subagent run gets no Exit reminder", r[3] is None, r[3])
 r = run([START, WORK, said("done"), SETTLE, START, WORK, said("done"), SETTLE])
 check("a new user prompt is checked again", nudged(r[3]) and nudged(r[7]), [r[3], r[7]])
+
+# --- a user message that arrives during a run is a prompt of its own: its reply is checked again ---
+r = run([START, WORK, said("done"), SETTLE, {"ev": "input", "behavior": "followUp"}, said("and more"), SETTLE])
+check("a queued user message gets its own Exit reminder", nudged(r[3]) and nudged(r[6]), [r[3], r[6]])
+r = run([START, WORK, said("done"), SETTLE, {"ev": "input", "behavior": "followUp", "source": "extension"}, said("x"), SETTLE])
+check("a message an extension sent does not", nudged(r[3]) and r[6] is None, [r[3], r[6]])
+
+# --- write and edit into a .git directory (config, hooks) ask first, like a risky command ---
+def fwrite(path, **kw): return {"ev": "tool", "tool": "write", "input": {"path": path, "content": "x"}, **kw}
+r = run([START, FLOW, fwrite("/r/.git/config"), {"ev": "tool", "tool": "edit", "input": {"path": ".git/hooks/pre-commit"}},
+         fwrite("/r/.github/workflows/x.yml"), fwrite("/r/src/.gitignore"), fwrite("/r/.git/config", ui=True, yes=True), fwrite("C:\\r\\.git\\config")])
+check("write into .git/config with no UI is blocked", blocked(r[2]) and "ask" in reason(r[2]).lower(), r[2])
+check("edit of .git/hooks is blocked", blocked(r[3]), r[3])
+check("write into .github is not .git", not blocked(r[4]), r[4])
+check(".gitignore is not .git", not blocked(r[5]), r[5])
+check("with a UI the user is asked, and a yes writes", not blocked(r[6]) and ".git/config" in ((r[6] or {}).get("asked") or [{}])[0].get("m", ""), r[6])
+check("a Windows path into .git is blocked", blocked(r[7]), r[7])
+r = run([START, FLOW, fwrite("/r/.GIT/config")])
+check(".GIT is .git on a disk that ignores case", blocked(r[2]), r[2])
+gd = os.path.realpath(tempfile.mkdtemp())
+os.mkdir(os.path.join(gd, ".git"))
+try:
+    os.symlink(os.path.join(gd, ".git"), os.path.join(gd, "meta"), target_is_directory=True)
+except OSError:
+    print("skip the symlink into .git: this Windows account cannot create symlinks")
+else:
+    r = run([START, FLOW, fwrite(os.path.join(gd, "meta", "config")), fwrite(os.path.join(gd, "notes.txt"))])
+    check("a path that reaches .git through a symlink is blocked", blocked(r[2]), r[2])
+    check("a plain file beside it is not", not blocked(r[3]), r[3])
+
+# --- a read-only subagent (reviewer, oracle) gets the hook's read-only rules ---
+RO = {"ev": "start", "opts": {"appendSystemPrompt": '<active_agent name="reviewer"/>\n\nbody'}}
+r = run([RO, bash("make check > /tmp/check.log 2>&1"), bash("git log -3")])
+check("reviewer subagent: a log redirect is blocked as read-only", blocked(r[1]) and "read-only" in reason(r[1]), r[1])
+check("reviewer subagent: reading runs", not blocked(r[2]), r[2])
+r = run([{"ev": "start", **SKIPS["subagent, appended prompt"]}, bash("make check > /tmp/check.log 2>&1")])
+check("worker subagent: a log redirect runs", not blocked(r[1]), r[1])
+r = run([RO, START, FLOW, bash("make check > /tmp/check.log 2>&1")])
+check("the main session after it is not read-only", not blocked(r[3]), r[3])
 
 # --- loaded twice in one session (a second path to the same package, or -e beside it): each effect happens once ---
 def twice(s): return dict(s, twice=True)

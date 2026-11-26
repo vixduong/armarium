@@ -33,6 +33,19 @@ WARN = [(BAND, "1", True), ("./hooks/claude-band.json", "1", True)]          # a
 SILENT = [(NO_BAND, "1", True), (BAND, "0", True), (BAND, "", True), (BAND, "1", False)]
 
 fails = 0
+if sys.platform != "win32":  # a file name cannot hold a quote there
+    home = tempfile.mkdtemp()
+    plugin = os.path.join(home, "cache", "pony\"tail", "5.3.3")
+    os.makedirs(os.path.join(plugin, ".claude-plugin")); os.makedirs(os.path.join(home, ".claude", "plugins"))
+    json.dump({"name": "ponytail", "hooks": BAND}, open(os.path.join(plugin, ".claude-plugin", "plugin.json"), "w"))
+    json.dump({"plugins": {"ponytail@ponytail": [{"installPath": plugin}]}}, open(os.path.join(home, ".claude", "plugins", "installed_plugins.json"), "w"))
+    p = subprocess.run(HOOK, input="{}", capture_output=True, text=True, env={"HOME": home, "PATH": os.environ["PATH"], "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1"})
+    try:
+        ok = plugin in json.loads(p.stdout)["systemMessage"]
+    except (ValueError, KeyError):
+        ok = False
+    fails += not ok
+    print("quote in the path: valid JSON " + ("ok  " if ok else "FAIL"), p.stdout[:70])
 for case in WARN:
     rc, out = run(*case)
     ok = rc == 0 and "claude-band.json" in json.loads(out or "{}").get("systemMessage", "")

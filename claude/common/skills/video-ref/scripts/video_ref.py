@@ -203,7 +203,7 @@ def main(argv):
     ap.add_argument("--images", action="store_true", help="link is an image post: use gallery-dl only")
     ap.add_argument("--browser", help="read login cookies from this browser (chrome, safari, firefox...)")
     args = ap.parse_args(argv)
-    work, created, done = None, False, False
+    work, created, emptied, done = None, False, False, False
     try:
         try:
             kind, source = check_source(args.source)
@@ -211,6 +211,8 @@ def main(argv):
             raise Fail(str(e), 2)
         if args.max_frames < 1 or not 0 < args.threshold < 1:
             raise Fail("--max-frames must be >= 1 and --threshold between 0 and 1", 2)
+        if args.out and os.path.exists(args.out) and not os.path.isdir(args.out):
+            raise Fail("--out %s is not a folder" % args.out, 2)
         if args.out and os.path.exists(args.out) and os.listdir(args.out):
             raise Fail("--out %s is not empty" % args.out, 2)
         for tool in ["ffmpeg", "ffprobe"] + ([("gallery-dl" if args.images else "yt-dlp")] if kind == "url" else []):
@@ -218,6 +220,7 @@ def main(argv):
         if args.out:
             work = os.path.abspath(args.out)
             created = not os.path.exists(work)
+            emptied = not created  # it exists and was checked empty: what a failed run leaves in it is ours to remove
             os.makedirs(work, exist_ok=True)
         else:
             base = os.path.abspath(args.dir or DEFAULT_DIR)
@@ -240,6 +243,10 @@ def main(argv):
     finally:
         if created and not done:  # only a folder this run made; a half-filled one would look like a finished reference
             shutil.rmtree(work, ignore_errors=True)
+        elif emptied and not done:  # the caller's own empty folder: keep it, empty it again
+            for name in os.listdir(work):
+                p = os.path.join(work, name)
+                shutil.rmtree(p, ignore_errors=True) if os.path.isdir(p) and not os.path.islink(p) else os.remove(p)
     print(work)
     print("%d frames, %d transcript(s), %d image(s); open contact.jpg first" % (len(index["frames"]), len(index["transcripts"]), index["images"]))
     return 0

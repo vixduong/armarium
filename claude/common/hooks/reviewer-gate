@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# Stop gate for Code flow step 8: a turn with a Flow line whose own edits are Big (>200 changed lines or >3 files,
-# markdown and text excluded) needs a `reviewer` agent or `code-review` call after this turn's prompt. Blocks once;
+# Stop gate for Code flow step 8: a turn with a Flow line whose own edits are not Small (>80 changed lines or >2 files,
+# markdown and text excluded) needs a `reviewer` agent or `code-review` call after this turn's prompt, made once at
+# least one of those edits existed: a review that ran before all of them (a plan review) does not count, where the
+# transcript shows every edit; with edits only git sees (REPL, subagents, Bash) the order is unknown and it counts. Blocks once;
 # stop_hook_active lets the retry through, so the agent runs the review instead of only listing it as ✗.
 # Counts Write/Edit/MultiEdit inputs of the transcript, plus what git sees in cwd: files changed since the turn's
 # prompt (REPL write()/edit(), subagents, Bash), each file counted once at its larger figure.
@@ -23,11 +25,12 @@ def lines(s): return len(str(s or "").splitlines())
 def key(p): return os.path.normcase(os.path.realpath(p))  # git and transcript agree (macOS /private/var, Windows slashes)
 
 def git_changes(cwd, since):
-    """{key(path): changed lines} for non-doc files in cwd's work tree modified at or after `since` (epoch s)."""
+    """({key(path): changed lines}, complete) for non-doc files in cwd's work tree modified at or after `since` (epoch s).
+    complete is False when the scan stopped early, the turn being past Small already."""
     def git(*a): return subprocess.run([which("git"), "-C", cwd, *a], capture_output=True, timeout=3).stdout.decode("utf-8", "replace")
     top = git("rev-parse", "--show-toplevel").strip()
     if not top:
-        return {}
+        return {}, True
     numstat = {}
     for rec in git("diff", "--numstat", "-z", "HEAD").split("\0"):
         parts = rec.split("\t")
@@ -49,15 +52,16 @@ def git_changes(cwd, since):
                 head = f.read(5_000_000)
             if b"\0" not in head[:8000]:  # binary (screenshots): not code
                 out[key(path)] = head.count(b"\n")
-        if len(out) > 3 or sum(out.values()) > 200:
-            break  # already Big
-    return out
+        if len(out) > 2 or sum(out.values()) > 80:
+            return out, False  # already past Small
+    return out, True
 
 try:
     data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     if data.get("stop_hook_active"):
         sys.exit(0)
     per_file, flow, reviewed, since = {}, False, False, None
+    after_edit = False  # whether a transcript edit of this turn preceded a review
     sec_reviewer = sec_skill = False  # step 8: `git rev-parse origin/HEAD` succeeds → `security-review`, not a security-only reviewer
     with open(data.get("transcript_path") or "", encoding="utf-8") as f:
         for line in f:
@@ -73,6 +77,7 @@ try:
                     isinstance(b, dict) and b.get("type") == "tool_result" for b in content))  # list: text + image
                 if typed and not r.get("isMeta") and (r.get("origin") or {}).get("kind", "human") == "human":
                     per_file, flow, reviewed = {}, False, False  # a new prompt starts a new turn
+                    after_edit = False
                     sec_reviewer = sec_skill = False
                     try:
                         since = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00")).timestamp()
@@ -106,12 +111,21 @@ try:
                         reviewed = True
                         sec_reviewer = sec_reviewer or bool(SECURITY.search(code))
                     sec_skill = sec_skill or bool(SEC_SKILL_IN_CODE.search(code))
-    if flow and not reviewed and since is not None and data.get("cwd"):
+                if ((name in ("Agent", "Task") and inp.get("subagent_type") == "reviewer")
+                        or (name == "Skill" and str(inp.get("skill", "")).split(":")[-1] == "code-review")
+                        or (name not in ("Write", "Edit", "MultiEdit", "Agent", "Task", "Skill") and REVIEW_IN_CODE.search(str(inp.get("code", ""))))):
+                    after_edit = after_edit or bool(per_file)  # this block is a review: had an edit come before it?
+    in_transcript, all_seen = set(per_file), True  # all_seen: every edit of the turn is a Write/Edit the transcript shows
+    if flow and since is not None and data.get("cwd"):
         try:
-            for path, n in git_changes(data["cwd"], since - 1).items():
+            changes, complete = git_changes(data["cwd"], since - 1)
+            all_seen = complete and all(path in in_transcript for path in changes)
+            for path, n in changes.items():
                 per_file[path] = max(per_file.get(path, 0), n)
         except (OSError, ValueError, subprocess.SubprocessError):
             pass
+    if reviewed and not after_edit and in_transcript and all_seen:
+        reviewed = False  # the review ran before every edit there is: it reviewed a plan, not this diff
     origin_head = False
     if sec_reviewer and not sec_skill and data.get("cwd"):
         try:
@@ -119,13 +133,14 @@ try:
                                          capture_output=True, timeout=3).returncode == 0
         except (OSError, subprocess.SubprocessError):
             pass
-except Exception:
+except Exception as e:  # a Stop hook never fails the turn; the stderr line tells a skipped check from a pass
+    sys.stderr.write("reviewer-gate: not checked (%s)\n" % type(e).__name__)
     sys.exit(0)
 
 reasons = []
 changed = sum(per_file.values())
-if flow and not reviewed and (changed > 200 or len(per_file) > 3):
-    reasons.append("This turn changed %d lines in %d files, which is Big (Code flow step 8), but no `reviewer` ran. "
+if flow and not reviewed and (changed > 80 or len(per_file) > 2):
+    reasons.append("This turn changed %d lines in %d files, which is not Small (Code flow step 8), but no `reviewer` ran on those edits. "
         "Run the `reviewer` agent on the diff now and fix its P0/P1; animation in the diff → also `review-animations`. "
         "A ✗ in the Exit does not replace the review." % (changed, len(per_file)))
 if origin_head:

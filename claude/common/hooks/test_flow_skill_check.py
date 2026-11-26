@@ -92,6 +92,19 @@ r = run([asst(text("hi"))], last="Flow: Code flow (`lean-build` + `tdd`)")
 if not blocked(r): fails += 1; print("FAIL: Flow line in last_assistant_message should count", r)
 miss = run([], path="C:/no/such/file.jsonl")
 if miss[0] != 0 or blocked(miss): fails += 1; print("missing transcript should pass")
+# a gate that could not run says so on stderr: silence would look the same as a pass
+p = subprocess.run([sys.executable, HOOK], input=json.dumps({"transcript_path": "C:/no/such/file.jsonl"}), capture_output=True, text=True, encoding="utf-8", env=ENV)
+if p.returncode != 0 or "flow-skill-check" not in p.stderr: fails += 1; print("FAIL: a skipped check should leave a stderr line", p.returncode, p.stderr[:80])
+# a reply with one very long blank line must not stall the Stop hook
+import time
+f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+f.write(json.dumps(asst(FLOW, skill("lean-build"), skill("tdd")))); f.close()
+stdin = json.dumps({"transcript_path": f.name, "last_assistant_message": " " * 30000 + "\n- ✓ gate green: bin/check"}, ensure_ascii=False)
+try:
+    p = subprocess.run([sys.executable, HOOK], input=stdin, capture_output=True, text=True, encoding="utf-8", env=ENV, timeout=10)
+    if p.stdout.strip(): fails += 1; print("FAIL: a long blank line before the Exit list should not block", p.stdout[:120])
+except subprocess.TimeoutExpired:
+    fails += 1; print("FAIL: a long blank line stalls the hook (over 10 s)")
 # the final reply's Exit list arrives on stdin before it reaches the transcript
 r = run([asst(FLOW, skill("lean-build"), skill("tdd"))], last=DONE["text"])
 if blocked(r): fails += 1; print("FAIL: Exit list in last_assistant_message should clear", r)

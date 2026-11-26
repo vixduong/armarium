@@ -2,7 +2,8 @@
 """Gate for this repo: bin/check [--repo-only] [repo]. Runs every self-test and the static checks below; exit 1 on any problem.
 --repo-only (CI): skips what only the owner's machine can answer, the Names check and ~/.claude pointers the repo does not ship.
 Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows/ each overlay it onto ~/.claude.
-- JSON: every settings.example.json (claude/unix, claude/windows, pi) parses.
+- JSON: every settings.example.json (claude/unix, claude/windows, pi) parses; so do .pi/settings.json and pi/package.json,
+  and the local packages and extensions they name exist. A self-test is cut off after 900 s (CHECK_TEST_TIMEOUT).
 - Settings: every ~/.claude/... path a setting calls exists in its OS dir or common/; unix hooks are executable.
 - Pointers: every `~/.claude/<file>` in common/ and unix/ *.md exists there or in ~/.claude; every bare `<name>.md` exists there.
 - Names: every Route lead-skill name, and every `plugin:skill` of an installed plugin, is an installed skill, an agent or built in;
@@ -44,8 +45,13 @@ tests = sorted(glob.glob(os.path.join(CLAUDE, "hooks", "test_*.py")) + glob.glob
                + glob.glob(os.path.join(WINDOWS, "hooks", "test_*.py"))
                + glob.glob(os.path.join(REPO, "pi", "test_*.py")))
 skipped = 0  # self-tests that left part of their work out and said so
+TEST_TIMEOUT = int(os.environ["CHECK_TEST_TIMEOUT"]) if os.environ.get("CHECK_TEST_TIMEOUT", "").isdigit() else 900  # s; wall clock, so generous: a laptop may nap mid-run
 for t in tests:
-    p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True)
+    try:
+        p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True, timeout=TEST_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        problems.append("%s timed out after %d s" % (rel(t), TEST_TIMEOUT))
+        continue
     skipped += bool(re.search(r"(?mi)^skip", p.stdout))
     if p.returncode:
         problems.append("%s failed:\n%s" % (rel(t), (p.stdout + p.stderr)[-800:]))
@@ -63,6 +69,23 @@ for f in [UNIX_SETTINGS, WINDOWS_SETTINGS, "pi/settings.example.json"]:
             settings[f] = json.load(fh)
     except ValueError as e:
         problems.append("%s does not parse: %s" % (f, e))
+
+
+# pi: the repo's own pi files parse, and the local paths they name exist
+for f, base, paths in ((".pi/settings.json", ".pi", lambda d: [p.get("source", "") if isinstance(p, dict) else str(p) for p in d.get("packages", [])]),
+                       ("pi/package.json", "pi", lambda d: (d.get("pi") or {}).get("extensions", []))):
+    path = os.path.join(REPO, f)
+    if not os.path.exists(path):
+        continue
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except ValueError as e:
+        problems.append("%s does not parse: %s" % (f, e))
+        continue
+    for p in paths(data) if isinstance(data, dict) else []:
+        if isinstance(p, str) and p.startswith((".", "/")) and not os.path.exists(os.path.join(REPO, base, p)):  # npm: and git: sources are not local
+            problems.append("%s names %s, which is not there" % (f, p))
 
 
 # Settings: paths the config calls

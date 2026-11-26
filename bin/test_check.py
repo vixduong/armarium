@@ -44,8 +44,8 @@ def fixture(files=None, settings=SETTINGS, skills=None, home_files=None):
     return repo, home
 
 
-def run(repo, home, args=()):
-    env = {"HOME": home, "PATH": os.environ["PATH"]}
+def run(repo, home, args=(), env_extra=None):
+    env = dict({"HOME": home, "PATH": os.environ["PATH"]}, **(env_extra or {}))
     if sys.platform == "win32":  # expanduser reads USERPROFILE there, so HOME alone left the real ~/.claude in play
         env.update(USERPROFILE=home, SystemRoot=os.environ["SystemRoot"])
     p = subprocess.run([sys.executable, CHECK, repo, *args], capture_output=True, text=True, env=env)
@@ -58,11 +58,11 @@ fails = total = 0
 
 def case(label, want_rc, want_text, **kw):
     global fails, total
-    pre, args, absent = kw.pop("pre", None), kw.pop("args", ()), kw.pop("absent", None)
+    pre, args, absent, env_extra = kw.pop("pre", None), kw.pop("args", ()), kw.pop("absent", None), kw.pop("env", None)
     repo, home = fixture(**kw)
     if pre:
         pre(repo)
-    rc, out = run(repo, home, args)
+    rc, out = run(repo, home, args, env_extra)
     ok = rc == want_rc and (want_text in out) and (absent is None or absent not in out)
     total += 1
     fails += not ok
@@ -240,6 +240,18 @@ case("pi/AGENTS.md staged without CLAUDE.md: a warning", 0, "WARN pi/AGENTS.md i
      files=TWIN, pre=stage("pi/AGENTS.md"))
 case("both staged: no warning", 0, "check: ok", absent="WARN", files=TWIN, pre=stage("claude/common/CLAUDE.md", "pi/AGENTS.md"))
 case("neither staged: no warning", 0, "check: ok", absent="WARN", files=TWIN, pre=stage("claude/common/CODING_STANDARDS.md"))
+
+# a self-test that hangs must not hang the commit: it is cut off and reported
+case("a self-test that hangs is cut off and fails the gate", 1, "test_hang.py timed out", env={"CHECK_TEST_TIMEOUT": "1"},
+     files={"claude/common/hooks/test_hang.py": "import time\ntime.sleep(30)\n"})
+
+# the repo's own pi files: .pi/settings.json and pi/package.json parse, and the local paths they name exist
+case("broken JSON in .pi/settings.json", 1, ".pi/settings.json", files={".pi/settings.json": "{"})
+case(".pi/settings.json names a local package that is not there", 1, "../nope", files={".pi/settings.json": json.dumps({"packages": ["../nope", "npm:x"]})})
+case(".pi/settings.json names the pi package: passes", 0, "check: ok", files=dict(PI_PKG, **{".pi/settings.json": json.dumps({"packages": ["../pi"]})}))
+case("pi/package.json names an extension that is not there", 1, "gone.ts", files={"pi/package.json": json.dumps({"pi": {"extensions": ["./gone.ts"]}})})
+case("pi/package.json names an extension that exists: passes", 0, "check: ok",
+     files={"pi/package.json": json.dumps({"pi": {"extensions": ["./ext/index.ts"]}}), "pi/ext/index.ts": "export default () => {}\n"})
 
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

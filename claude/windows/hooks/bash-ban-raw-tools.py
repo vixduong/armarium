@@ -29,6 +29,18 @@ def main():
     if tool not in ("bash", "powershell"):
         return 0
 
+    cmd = str((p.get("tool_input") or {}).get("command") or "")
+    first = re.split(r"\s+", cmd.lstrip())[0]
+    # The unlock file is the user's to create, from a terminal of their own: a command that names it (quotes, backslashes
+    # and PowerShell backticks inside the name aside) may look at it and nothing else. Holds while unlocked too.
+    # shortcut: a name built from variables or a wildcard gets past, as in bash-ban-shell-writes.
+    looks = re.match(r"^(Get-ChildItem|gci|ls|dir|Test-Path|Get-Item|gi|Select-String|sls|findstr|grep|rg|stat)$", first, re.I) or re.match(
+        r"^\s*git\s+(grep|log|show|blame)\b(?!.*--output)", cmd, re.I | re.S)
+    if "bash-raw-unlock" in re.sub(r"""['"`^]""", "", cmd) and (not looks or re.search(r"[>|;&\n(){}]", cmd)):  # one plain command, nothing nested or chained
+        sys.stderr.write("BLOCKED: this command names the unlock file. Only the user creates it, from a terminal of their own. "
+                         "Ask the user in your reply if the block is in the way.\n")
+        return 2
+
     # Unlock is per session and absent from the block messages: it is for the user.
     # Expires after 10 min; a future mtime (clock skew, forged) counts as expired.
     temp = os.environ.get("TEMP")
@@ -36,14 +48,12 @@ def main():
         unlock = os.path.join(temp, "bash-raw-unlock-%d" % os.getppid())
         try:
             age = time.time() - os.stat(unlock).st_mtime
-            if 0 <= age < 600:
+            if os.path.isfile(unlock) and 0 <= age < 600:  # a folder of that name is no unlock
                 return 0
             os.remove(unlock)
         except OSError:
             pass
 
-    cmd = str((p.get("tool_input") or {}).get("command") or "")
-    first = re.split(r"\s+", cmd.lstrip())[0]
     if first.lower() == "rtk":  # rtk wraps git/cargo/pytest/docker/etc.
         return 0
 

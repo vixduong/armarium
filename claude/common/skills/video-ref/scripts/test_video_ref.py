@@ -158,6 +158,22 @@ class FakeDownload(unittest.TestCase):
         with open(self.log) as f:
             self.assertEqual(os.path.realpath(f.read()), os.path.realpath(out), "yt-dlp ran where a repo's yt-dlp.conf applies")
 
+    def test_out_that_is_a_file_exits_2_with_a_message(self):
+        out = os.path.join(self.tmp, "taken.txt")
+        with open(out, "w") as f:
+            f.write("x")
+        p = self.run_cli("--out", out)
+        self.assertEqual(p.returncode, 2, p.stderr)
+        self.assertIn("not a folder", p.stderr)
+        self.assertNotIn("Traceback", p.stderr)
+
+    def test_failed_run_leaves_an_empty_out_folder_empty(self):
+        out = os.path.join(self.tmp, "out")
+        os.mkdir(out)
+        p = self.run_cli("--out", out, mode="badjson")
+        self.assertNotEqual(p.returncode, 0)
+        self.assertEqual(os.listdir(out), [], "a half-filled folder would look like a finished reference")
+
     def test_unexpected_error_leaves_no_incoming_folder(self):
         p = self.run_cli(mode="badjson")
         self.assertNotEqual(p.returncode, 0)

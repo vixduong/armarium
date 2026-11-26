@@ -30,5 +30,5 @@ Then merge `settings.example.json` into `~\.claude\settings.json` by hand and re
 
 ## Known gaps
 
-- `bash-ban-shell-writes` and `bash-ban-raw-tools.py` share the 10-minute unlock file `%TEMP%\bash-raw-unlock-<pid>`. Both take the PID from `os.getppid()`, which is the `python` launcher's when `python` is a launcher (uv, py).
+- `bash-ban-shell-writes` and `bash-ban-raw-tools.py` share the 10-minute unlock file `%TEMP%\bash-raw-unlock-<pid>`. You create it from your own terminal: a Bash or PowerShell command that names it is blocked unless it only looks. Both take the PID from `os.getppid()`, which is the `python` launcher's when `python` is a launcher (uv, py).
 - Every hook is Python: a PowerShell start cost 0.3 to 0.9 s (measured) where the macOS hooks start bash, and the session-start hooks ran in parallel with the slowest setting the wait. `cbm_session_reminder.py`: `hook-augment` takes about 2 s, so a stale cache is replayed at once and refreshed in the background, and the graph context can lag one index behind.

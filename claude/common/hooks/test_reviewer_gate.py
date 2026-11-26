@@ -27,7 +27,12 @@ def blocked(r): return r[0] == 0 and r[1].get("decision") == "block"
 CASES = [  # (name, records, active, expect_block)
     ("big write, no reviewer", [asst(FLOW, write("/r/index.html", 250)), asst(text("done"))], False, True),
     ("big write, reviewer after", [asst(FLOW, write("/r/index.html", 250)), asst(agent("reviewer")), asst(text("done"))], False, False),
-    ("small write", [asst(FLOW, write("/r/index.html", 150)), asst(text("done"))], False, False),
+    ("medium write is not Small: needs a review", [asst(FLOW, write("/r/index.html", 150)), asst(text("done"))], False, True),
+    ("small write", [asst(FLOW, write("/r/index.html", 60)), asst(text("done"))], False, False),
+    ("3 files is not Small", [asst(FLOW, *(write("/r/f%d.js" % i, 5) for i in range(3))), asst(text("done"))], False, True),
+    ("2 small files", [asst(FLOW, *(write("/r/f%d.js" % i, 5) for i in range(2))), asst(text("done"))], False, False),
+    ("reviewer before the only edits does not count", [asst(FLOW, agent("reviewer")), asst(write("/r/index.html", 250)), asst(text("done"))], False, True),
+    ("a fix after the review keeps the review", [asst(FLOW, write("/r/index.html", 250)), asst(agent("reviewer")), asst(write("/r/index.html", 5)), asst(text("done"))], False, False),
     ("edits add up past 200", [asst(FLOW, edit("/r/a.js", 60, 60), edit("/r/a.js", 50, 50)), asst(text("done"))], False, True),
     ("more than 3 files", [asst(FLOW, *(write("/r/f%d.js" % i, 5) for i in range(4))), asst(text("done"))], False, True),
     ("markdown only", [asst(FLOW, write("/r/REPORT.md", 400)), asst(text("done"))], False, False),
@@ -68,9 +73,9 @@ with tempfile.TemporaryDirectory() as repo:
     lines_file(os.path.join(repo, "old.js"), 250); os.utime(os.path.join(repo, "old.js"), (OLD, OLD))
     r = run(REPL_TURN, cwd=repo)
     if blocked(r): fails += 1; print("FAIL file dirty from before the turn does not count: %s" % (r,))
-    lines_file(os.path.join(repo, "w.js"), 150)
-    r = run([prompt("go", T0), asst(FLOW, write(os.path.join(repo, "w.js"), 150)), asst(text("done"))], cwd=repo)
-    if blocked(r): fails += 1; print("FAIL a Write git also sees is counted once (150, not 300): %s" % (r,))
+    lines_file(os.path.join(repo, "w.js"), 60)
+    r = run([prompt("go", T0), asst(FLOW, write(os.path.join(repo, "w.js"), 60)), asst(text("done"))], cwd=repo)
+    if blocked(r): fails += 1; print("FAIL a Write git also sees is counted once (60, not 120): %s" % (r,))
     os.remove(os.path.join(repo, "w.js")); os.remove(os.path.join(repo, "old.js"))
     os.makedirs(os.path.join(repo, "src")); lines_file(os.path.join(repo, "src", "a.js"), 60)
     r = run([prompt("go", T0), asst(FLOW, write(os.path.join(repo, "src", "a.js"), 60)), asst(text("done"))], cwd=repo)
@@ -95,6 +100,16 @@ with tempfile.TemporaryDirectory() as repo:
     lines_file(os.path.join(repo, "t.js"), 230)
     r = run(REPL_TURN, cwd=repo)
     if not blocked(r): fails += 1; print("FAIL tracked file edited this turn counts via numstat: %s" % (r,))
+    # a review that ran before any file changed (a plan review) is not the review of this diff
+    early = dict(asst(agent("reviewer")), timestamp="2026-01-01T00:00:01.000Z")
+    r = run([prompt("go", T0), asst(FLOW), early, asst(repl("await write('t.js', s)")), asst(text("done"))], cwd=repo)
+    if blocked(r): fails += 1; print("FAIL edits the transcript cannot see leave the order unknown, so the review counts: %s" % (r,))
+    # a worker changed t.js (seen only by git), the reviewer ran, then the main agent fixed one line with Edit: reviewed
+    r = run([prompt("go", T0), asst(FLOW), asst(agent("reviewer")), asst(edit(os.path.join(repo, "t.js"), 1, 1)), asst(text("done"))], cwd=repo)
+    if blocked(r): fails += 1; print("FAIL a fix after the review of a git-seen change keeps the review: %s" % (r,))
+    lines_file(os.path.join(repo, "u.js"), 5)
+    r = run([prompt("go", T0), asst(FLOW), asst(agent("reviewer")), asst(edit(os.path.join(repo, "t.js"), 1, 1)), asst(text("done"))], cwd=repo)
+    if blocked(r): fails += 1; print("FAIL another file only git sees: order unknown, review counts: %s" % (r,))
 # Step 8: a security-only reviewer stands in for `security-review` only when origin/HEAD does not resolve in the cwd.
 def sec_agent(): return {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "reviewer", "prompt": "SECURITY-ONLY review of the diff"}}
 SEC_REPL = repl("await tools.Agent({subagent_type: 'reviewer', prompt: 'SECURITY-ONLY review of x.diff: authorization, IDOR'})")
@@ -137,5 +152,7 @@ if os.name != "nt":
             subprocess.run([sys.executable, HOOK], input=json.dumps({"transcript_path": t.name, "cwd": proj}), capture_output=True,
                            text=True, cwd=proj, env=dict(os.environ, PATH="."))
             if os.path.exists(os.path.join(proj, "ran")): fails += 1; print("FAIL %s ran a git from the cwd" % name)
+p = subprocess.run([sys.executable, HOOK], input=json.dumps({"transcript_path": "/no/such/file.jsonl"}), capture_output=True, text=True, encoding="utf-8")
+if p.returncode != 0 or "reviewer-gate" not in p.stderr: fails += 1; print("FAIL a skipped check should leave a stderr line: %s %s" % (p.returncode, p.stderr[:80]))
 print("ok" if not fails else "%d failed" % fails)
 sys.exit(1 if fails else 0)

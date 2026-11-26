@@ -38,5 +38,6 @@ for i in BLOCK:
 for i in ALLOW:
     if run("Agent", i) != 0: fails += 1; print("SHOULD ALLOW:", i)
 if run("Bash", {"command": "ls"}) != 0: fails += 1; print("non-Agent tool should pass")
-print("FAILS", fails, "of", len(BLOCK) + len(ALLOW) + 1)
+if run("Task", {"subagent_type": "reviewer", "model": "haiku"}) != 2: fails += 1; print("the Task tool name is the same tool: SHOULD BLOCK")
+print("FAILS", fails, "of", len(BLOCK) + len(ALLOW) + 2)
 sys.exit(1 if fails else 0)

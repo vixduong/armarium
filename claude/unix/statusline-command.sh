@@ -75,6 +75,7 @@ cost_seg=""; [ -n "$cost" ] && ! zero "$cost" && cost_seg="${Y}\$$(printf '%.3f'
 
 # Idle budget: time left until the prompt cache goes cold (next turn then re-caches in full)
 idle_seg=""
+case "${cache_exp%.*}" in ''|*[!0-9]*) cache_exp="" ;; esac  # digits only: shell arithmetic would evaluate anything else
 if [ -n "$cache_exp" ]; then
   left=$(( ${cache_exp%.*} - $(date +%s) ))
   if [ "$left" -le 0 ]; then idle_seg="${D}idle${Z} ${R}cold${Z}"

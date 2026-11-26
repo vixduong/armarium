@@ -74,6 +74,17 @@ env = {"HOME": h, "PATH": os.environ["PATH"]}
 p = subprocess.run([HOOK], input="{}", capture_output=True, text=True, env=env)
 check("no cwd passes through", p.returncode == 0 and p.stdout.strip() == GRAPH, p.stdout)
 
+# a hook-augment that hangs is cut off: nothing printed, nothing cached, and the session start goes on
+import time
+h = setup()
+with open(os.path.join(h, ".local", "bin", "codebase-memory-mcp"), "w") as f:
+    f.write("#!/bin/sh\ncat >/dev/null\nsleep 20\nprintf '%s' '" + GRAPH.replace("'", "") + "'\n")
+os.chmod(os.path.join(h, ".local", "bin", "codebase-memory-mcp"), 0o755)
+t0 = time.time()
+p = subprocess.run([HOOK], input=json.dumps({"cwd": "/repo/x"}), capture_output=True, text=True, env={"HOME": h, "PATH": os.environ["PATH"], "CBM_HOOK_TIMEOUT": "1"})
+check("hung binary: cut off", p.returncode == 0 and p.stdout == "" and time.time() - t0 < 10, "%r %.1f s" % (p.stdout[:40], time.time() - t0))
+check("hung binary: nothing cached", cached(h) == [], str(cached(h)))
+
 # a cache dir that cannot be made: the graph still prints, and no shell error reaches the session
 h = setup(); stub(h, GRAPH)
 open(os.path.join(h, ".cache", "codebase-memory-mcp", "hook-cache"), "w").close()  # a file where the dir should be: mkdir -p fails

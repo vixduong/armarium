@@ -45,6 +45,12 @@ foreach ($f in $files) {
   if ($state -eq 'same') { continue }
   "{0,-8} {1}" -f $state, $f.Rel
   if (-not $Apply) { continue }
+  # A symlink or junction here means this ~/.claude is linked to a clone (the macOS/Linux layout): writing would go
+  # through the link into the repo file. Stop instead; a hard link (LinkType HardLink) is an ordinary file.
+  $existing = Get-Item -LiteralPath $to -Force -ErrorAction SilentlyContinue
+  if ($existing -and $existing.LinkType -in 'SymbolicLink', 'Junction') {
+    throw "$to is a $($existing.LinkType): remove the link first, or edit the clone it points to"
+  }
   if ($state -eq 'replace') {
     $b = Join-Path $bak $f.Rel; New-Item -ItemType Directory -Force (Split-Path $b) | Out-Null; Copy-Item $to $b
   }

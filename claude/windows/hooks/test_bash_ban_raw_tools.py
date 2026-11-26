@@ -50,6 +50,18 @@ check("fresh unlock", gate("cat a.txt")[0], 0)
 future = time.time() + 3600
 os.utime(unlock, (future, future))
 check("future unlock is expired", (gate("cat a.txt")[0], os.path.exists(unlock)), (2, False))
+# the unlock file is the user's: a command that names it is blocked unless it only looks, in either shell and also while unlocked
+for c, tool in [("New-Item $env:TEMP\\bash-raw-unlock-1", "PowerShell"), ("ni \"$env:TEMP\\bash-raw-un`lock-1\"", "PowerShell"),
+                ("touch /tmp/bash-raw-unlock-1", "Bash"), ("dir | Out-File $env:TEMP\\bash-raw-unlock-1", "PowerShell"),
+                ("echo x > $env:TEMP\\bash-raw-unlock-1", "PowerShell"), ("git diff --output=/tmp/bash-raw-unlock-1", "Bash"),
+                ("git init /tmp/bash-raw-unlock-1", "Bash"), ("ls\nni $env:TEMP\\bash-raw-unlock-1", "PowerShell"),
+                ("Get-Item (New-Item $env:TEMP\\bash-raw-unlock-1)", "PowerShell")]:
+    check("unlock file: blocked " + c, gate(c, tool)[0], 2)
+for c, tool in [("Test-Path $env:TEMP\\bash-raw-unlock-1", "PowerShell"), ("git grep -n bash-raw-unlock", "Bash"), ("dir $env:TEMP\\bash-raw-unlock-*", "PowerShell")]:
+    check("unlock file: looking is fine " + c, gate(c, tool)[0], 0)
+open(unlock, "w").close()
+check("unlock file: still blocked while unlocked", gate("New-Item " + unlock, "PowerShell")[0], 2)
+os.remove(unlock)
 
 # shim
 def shim(args, env=BASE, data=b""):
