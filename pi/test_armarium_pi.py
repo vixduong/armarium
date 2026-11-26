@@ -1,6 +1,6 @@
 """Self-test for pi/armarium-pi/index.ts: python3 -I pi/test_armarium_pi.py
 Drives the extension's handlers with a fake pi in node (needs node >= 22.18 for .ts); never touches ~/.pi."""
-import json, os, pathlib, re, shutil, subprocess, sys
+import json, os, pathlib, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -19,7 +19,9 @@ DRIVER = """
 const ext = (await import(process.argv[1])).default;
 const handlers = {}, second = {};
 ext({ on: (name, fn) => { handlers[name] = fn; } });
-ext({ on: (name, fn) => { second[name] = fn; } });  // a second copy in the same session; steps with "twice" reach both, in pi's order
+// a second copy in the same session; steps with "twice" reach both, in pi's order. argv[3]: the copy comes from another path to the file.
+const ext2 = process.argv[3] ? (await import(process.argv[3])).default : ext;
+ext2({ on: (name, fn) => { second[name] = fn; } });
 let step = 0;
 const out = [];
 const REG = Symbol.for("pi-subagents.required-child-extensions.v1");
@@ -72,7 +74,7 @@ for (const s of JSON.parse(process.argv[2])) {
     ctx.sessionManager = session;
     let r;  // pi's emitToolCall: the first block ends the chain
     for (const h of copies) {
-      r = (await h.tool_call({ type: "tool_call", toolName: s.tool, toolCallId: "t" + step, input: s.input,
+      r = (await h.tool_call({ type: "tool_call", toolName: s.tool, toolCallId: s.id ?? "t" + step, input: s.input,
         ...(s.parent ? { parentToolCallId: s.parent } : {}) }, ctx)) ?? r;
       if (r?.block) break;
     }
@@ -90,10 +92,11 @@ def check(label, ok, detail=""):
     fails += not ok
     print(("ok   " if ok else "FAIL ") + label, "" if ok else detail)
 
-def run(steps, path=None):
-    """path: the PATH the extension sees (node itself is started by full path)."""
-    p = subprocess.run([shutil.which("node"), "--no-warnings", "--input-type=module", "-e", DRIVER, pathlib.Path(EXT).as_uri(), json.dumps(steps)],
-                       capture_output=True, encoding="utf-8", cwd=HERE, env=None if path is None else dict(os.environ, PATH=path))
+def run(steps, path=None, second=None):
+    """path: the PATH the extension sees (node itself is started by full path). second: another path to index.ts for the second copy."""
+    argv = [shutil.which("node"), "--no-warnings", "--input-type=module"] + (["--preserve-symlinks"] if second else [])
+    argv += ["-e", DRIVER, pathlib.Path(EXT).as_uri(), json.dumps(steps)] + ([pathlib.Path(second).as_uri()] if second else [])
+    p = subprocess.run(argv, capture_output=True, encoding="utf-8", cwd=HERE, env=None if path is None else dict(os.environ, PATH=path))
     if p.returncode:
         check("driver runs", False, p.stderr[-1500:])
         return [None] * len(steps)
@@ -233,6 +236,8 @@ r = run([START, said("4"), SETTLE])
 check("no Flow line (chat answer): settles", r[2] is None, r[2])
 r = run([START, {"ev": "msg", "text": "Flow: answer directly", "calls": 1}, said("It is 4."), SETTLE])
 check("Flow: answer directly needs no Exit list", r[3] is None, r[3])
+r = run([START, {"ev": "msg", "text": "`Flow: Question answered in chat, no file change` — reviewing a diff", "calls": 1}, said("Findings: none."), SETTLE])
+check("the chat row written by its Route name needs no Exit list", r[3] is None, r[3])
 r = run([START, WORK, said("done"), {"ev": "settle", "outcome": "aborted"}, {"ev": "settle", "outcome": "error"}])
 check("an aborted or failed run is left alone", r[3] is None and r[4] is None, r[3:])
 KEPT = {"type": "custom", "customType": "other-extension"}
@@ -255,6 +260,18 @@ check("loaded twice: the user is asked once, and a yes runs the command", len((r
 check("loaded twice: a yes covers that one call only", len((r[3] or {}).get("asked", [])) == 1 and blocked(r[3]), r[3])
 r = run([twice(START), twice(READ)])
 check("loaded twice: the Flow gate still blocks", blocked(r[1]), r[1])
+r = run([START, FLOW, bash("kill 1", ui=True, yes=True, id="call_7"), bash("kill 1", ui=True, yes=False, id="call_7")])
+check("a yes is not kept for a later call with the same id", len((r[3] or {}).get("asked", [])) == 1 and blocked(r[3]), r[3])
+r = run([twice(START), twice(FLOW), twice(bash("kill 1", ui=True, yes=True, id="call_7")), twice(bash("kill 1", ui=True, yes=False, id="call_7"))])
+check("loaded twice: nor after the second copy used it", len((r[2] or {}).get("asked", [])) == 1 and len((r[3] or {}).get("asked", [])) == 1 and blocked(r[3]), r[2:])
+link = os.path.join(tempfile.mkdtemp(), "pi-link")
+try:
+    os.symlink(HERE, link, target_is_directory=True)
+except OSError:
+    print("skip the symlinked copy: this Windows account cannot create symlinks")
+else:
+    r = run([twice(START)], second=os.path.join(link, "armarium-pi", "index.ts"))
+    check("loaded twice through a symlink: the rules are added once", [f["path"] for f in r[0] or []] == [rules["path"], PROJECT["path"]], [f["path"] for f in r[0] or []])
 
 # --- every pi-subagents child of this session must load this extension ---
 # requireForAllRunners: pi-subagents then refuses machine and external-CLI launches and keeps the snapshot with the run.

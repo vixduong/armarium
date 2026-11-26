@@ -9,7 +9,7 @@ import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = dirname(realpathSync(fileURLToPath(import.meta.url))); // one path however the file was reached: a second copy must find the rules already added
 const path = join(here, "..", "AGENTS.md");
 const shared = join(here, "..", "..", "claude", "common") + "/";
 
@@ -98,6 +98,7 @@ export default function (pi: ExtensionAPI) {
 	let needsExit = false; // a Flow line other than `answer directly` was written
 	let exitAsked = false;
 	let lastText = ""; // text of the latest assistant message: the final reply when the run settles
+	let approvedHere: string | undefined; // the tool call this copy got a yes for
 
 	// contextFiles is rebuilt for each run, so read on each run: an edit to AGENTS.md is live without /reload.
 	pi.on("before_agent_start", (event, ctx) => {
@@ -157,7 +158,7 @@ export default function (pi: ExtensionAPI) {
 		const flows = lastText.split("\n").filter((l) => FLOW_LINE.test(l));
 		if (flows.length) flowSeen = true;
 		else if (!flowSeen && parts.some((c) => c.type === "toolCall")) attempts++;
-		if (flows.some((l) => !/answer directly/i.test(l))) needsExit = true;
+		if (flows.some((l) => !/answer directly|answered in chat/i.test(l))) needsExit = true; // the chat row, by its flow or its Route name
 	});
 
 	// AGENTS.md Exit: every final reply except a chat answer lists the row's Done-when items, each ✓ or ✗.
@@ -199,7 +200,11 @@ export default function (pi: ExtensionAPI) {
 			"Stop and ask the user in your reply. A subagent has no user here, and a supervisor's yes does not open this check: " +
 			"report the command as blocked in your final answer.";
 		if (!ctx.hasUI) return { block: true, reason };
-		if (globals[APPROVED] === event.toolCallId) return; // another copy asked about this call and got a yes
+		// Another copy asked about this call and got a yes: use that yes once. A later call with the same id is asked again.
+		if (globals[APPROVED] === event.toolCallId && approvedHere !== event.toolCallId) {
+			delete globals[APPROVED];
+			return;
+		}
 		// The match goes first so padding cannot push the risky part out of the dialog.
 		const shown = command.length > 800 ? `${command.slice(0, 800)}\n… (${command.length} chars)` : command;
 		const yes = await ctx.ui.confirm("armarium-pi: allow this command?", `Matched: ${line.slice(0, 300)}\n\n${shown}`, {
@@ -207,7 +212,9 @@ export default function (pi: ExtensionAPI) {
 			signal: ctx.signal,
 		});
 		// confirm returns false for a no, a timeout and an abort alike.
+		approvedHere = yes ? event.toolCallId : undefined;
 		if (yes) globals[APPROVED] = event.toolCallId;
+		else delete globals[APPROVED];
 		return yes ? undefined : { block: true, reason: "armarium-pi: no yes from the user for this command. Ask in your reply how to proceed." };
 	});
 }
