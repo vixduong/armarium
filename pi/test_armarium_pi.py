@@ -55,7 +55,8 @@ for (const s of JSON.parse(process.argv[2])) {
     const asked = [];
     const ctx = { hasUI: !!s.ui, signal: undefined, ui: { confirm: async (t, m, o) => { asked.push({ m, timeout: o?.timeout }); return !!s.yes; } } };
     ctx.sessionManager = session;
-    const r = await handlers.tool_call({ type: "tool_call", toolName: s.tool, toolCallId: "t", input: s.input }, ctx);
+    const r = await handlers.tool_call({ type: "tool_call", toolName: s.tool, toolCallId: "t", input: s.input,
+      ...(s.parent ? { parentToolCallId: s.parent } : {}) }, ctx);
     out.push({ result: r ?? null, asked });
   }
 }
@@ -171,6 +172,13 @@ r = run([START, FLOW, {"ev": "tool", "tool": "ctx_batch", "input": {"commands": 
          {"ev": "tool", "tool": "ctx_execute", "input": {"language": "shell", "code": "echo hi\nrm -rf /data"}}])
 check("ctx_batch with a risky command is checked", blocked(r[2]), r[2])
 check("ctx_execute with a risky command is checked", blocked(r[3]), r[3])
+# A codemode script reaches bash through ctx.executeTool(): pi fires tool_call with the nested tool's own name and a
+# parentToolCallId (pi docs/extensions.md, "Calling Other Tools"), so codemode itself needs no entry in SHELL_TOOLS.
+# Seen live on pi 1.6.1, 2026-11-27: `git reset --hard` from a codemode script came back blocked, the file unchanged.
+r = run([START, FLOW, bash("git reset --hard", parent="call_1"), bash("git status", parent="call_1"), START, bash("ls", parent="call_2")])
+check("a risky bash call nested in a codemode script is blocked", blocked(r[2]) and "ask" in reason(r[2]).lower(), r[2])
+check("a benign nested call runs", not blocked(r[3]), r[3])
+check("a nested call before the Flow line is blocked", blocked(r[5]) and "Flow:" in reason(r[5]), r[5])
 for name in ["subagent, appended prompt", "-nc"]:
     r = run([{"ev": "start", **SKIPS[name]}, bash("git push --force")])
     check(name + ": risky still blocked", blocked(r[1]), r[1])
