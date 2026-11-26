@@ -20,5 +20,5 @@ if [ -n "$cwd" ] && [ -s "$f" ] && [[ $(<"$f") == *additionalContext* ]] && [ "$
 fi
 out=$(printf '%s' "$INPUT" | "$BIN" hook-augment 2>/dev/null)
 printf '%s' "$out"
-if [ -n "$cwd" ] && [[ $out == *additionalContext* ]]; then mkdir -p "$C" && printf '%s' "$out" > "$f"; fi 2>/dev/null
+if [ -n "$cwd" ] && [[ $out == *additionalContext* ]]; then mkdir -p "$C" && printf '%s' "$out" > "$f.$$" && mv -f "$f.$$" "$f"; fi 2>/dev/null  # rename: a parallel session never reads half a file
 exit 0

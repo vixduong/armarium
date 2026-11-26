@@ -162,5 +162,11 @@ case("full path, resolved or computed program passes", 0, "check: ok",
      files={"claude/windows/hooks/x.py": 'import os, subprocess, sys\nexe = "x"\nsubprocess.run(["C:/Windows/System32/cmd.exe", "/c"])\n'
             'subprocess.Popen([exe, "a"])\nsubprocess.run([sys.executable, "-I"])\nsubprocess.run([exe] + ["b"])\n'})
 
+case("bare program name in a shared Python hook", 1, "runs bare 'git'",
+     files={"claude/common/hooks/py-hook": '#!/usr/bin/env python3\nimport subprocess\nsubprocess.run(["git", "status"])\n'})
+case("shared Python hook that resolves the program passes", 0, "check: ok",
+     files={"claude/common/hooks/py-hook": '#!/usr/bin/env python3\nimport subprocess\nfrom path_only import which\n'
+            'subprocess.run([which("git"), "status"])\n'})
+
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

@@ -4,6 +4,7 @@
 # A copy install (CLAUDE.md is a plain file) is left alone. Copies are reported, never replaced.
 # Self-test: python3 -I ~/.claude/hooks/test_armarium_links.py
 import json, os, subprocess, sys
+from path_only import which
 
 DOT = os.path.expanduser("~/.claude")
 anchor = os.path.join(DOT, "CLAUDE.md")
@@ -14,7 +15,7 @@ if not os.path.isfile(os.path.join(common, "hooks", "armarium-links")):  # CLAUD
     sys.exit(0)
 src_dir = os.path.dirname(common)  # <repo>/claude
 try:
-    files = subprocess.run(["git", "-C", src_dir, "ls-files", "-z", "common", "unix"], capture_output=True, text=True,
+    files = subprocess.run([which("git"), "-C", src_dir, "ls-files", "-z", "common", "unix"], capture_output=True, text=True,
                            timeout=10, check=True).stdout.split("\0")
 except (OSError, subprocess.SubprocessError):
     sys.exit(0)

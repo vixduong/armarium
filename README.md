@@ -32,7 +32,7 @@ claude/                      common/ plus one OS overlay mirrors ~/.claude
 │   ├── settings.example.json    opt-in: env, permissions, hooks, plugins, models
 │   ├── statusline-command.sh    status line: tokens, cost, limits
 │   └── hooks/               the bash hooks; see below
-└── windows/                 PowerShell hooks, status line, settings and installer; see claude/windows/README.md
+└── windows/                 Python hooks, status line, settings and installer; see claude/windows/README.md
 pi/                          the same rule set for the pi coding agent, as a pi package
 ├── AGENTS.md                the rules, in pi's tool, agent and skill names
 ├── armarium-pi/index.ts     loads AGENTS.md into every pi run and enforces two of its rules
@@ -46,15 +46,16 @@ docs/
 Hooks (each runs only once its entry from `settings.example.json` is in your `settings.json`):
 
 - `agent-no-downgrade` blocks an `Agent` call whose `model` is below that agent's frontmatter model, except the drops listed in `agent-tuning.md`. Self-test: `python3 -I hooks/test_agent_no_downgrade.py`.
-- `flow-skill-check` (Stop) blocks the end of a turn once when a `Flow:` line names a skill with no `Skill` call after that line, no `/skill` command that started the task, and no later reply listing it as ✗. It also blocks once when a turn with a Flow line ends on a reply with no ✓ or ✗ line (no Exit list). Only Flow lines after the last user message are checked, and the final reply is read from the hook's `last_assistant_message` input. Self-test: `python3 -I hooks/test_flow_skill_check.py`.
-- `bash-ban-raw-tools` blocks raw `cat`, `head`, `tail`, `find`, `grep`, `rg` and `wc` in Bash and points to the dedicated tools. A temporary unlock file lasts 10 minutes.
+- `flow-skill-check` (Stop) blocks the end of a turn once when a `Flow:` line names a skill with no `Skill` call after that line, no `/skill` command that started the task, and no later reply listing it as ✗. It also blocks once when a turn with a Flow line ends on a reply with no ✓ or ✗ line (no Exit list), when a ✓ item names an exception, and when the turn changed files the frontend gate covers but its Flow line has no UI row. Only skill names found under `~/.claude/skills` are checked, so a plugin skill such as `humanizer` is not. Only Flow lines after the last user message are checked, and the final reply is read from the hook's `last_assistant_message` input. Self-test: `python3 -I hooks/test_flow_skill_check.py`.
+- `reviewer-gate` (Stop) blocks the end of a turn once when a turn with a Flow line changed more than 200 lines or more than 3 files (markdown and text excluded) and no `reviewer` agent or `code-review` call followed. It also blocks once when a security-only `reviewer` ran although `git rev-parse origin/HEAD` resolves and `security-review` was not called. Self-test: `python3 -I hooks/test_reviewer_gate.py`.
+- `bash-ban-raw-tools` blocks raw `cat`, `head`, `tail`, `find`, `grep`, `rg` and `wc` in Bash and points to the dedicated tools. Once `rtk` is installed it lets those readers through, since `rtk` filters their output, and blocks only a `| head` or `| tail` after one. A temporary unlock file lasts 10 minutes.
 - `bash-ban-shell-writes` blocks file writes from Bash: a heredoc into a file, `echo`/`printf`/`cat > file`, `sed -i`, `perl -i`, `tee`, and a python script fed on stdin. It lets through a heredoc into a command (`git commit -F -`), log redirects (`make check > log 2>&1`) and `/dev/null`. It shares the unlock file with `bash-ban-raw-tools`. Self-test: `python3 -I hooks/test_bash_ban_shell_writes.py`.
 - `run-cli-hook` finds a CLI such as `rtk` when the hook environment has no PATH, and exits 0 if it is not installed.
 - `cbm-session-reminder` adds `codebase-memory-mcp` graph context when a session starts, cached per folder until an index changes; a notice such as "no CBM daemon" is shown but never cached. It does nothing if the binary is missing. Self-test: `python3 -I hooks/test_cbm_session_reminder.py`.
 - `codemode-ponytail-band` runs at session start when `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`. Code Mode falls back to ordinary tools while a plugin's JS mod checks tool calls, and ponytail ships one (`hooks/claude-band.json`). Removing that entry from the cached `plugin.json` lets Code Mode start; a ponytail update puts it back, and this hook says so. Self-test: `python3 -I hooks/test_codemode_ponytail_band.py`.
 - `armarium-links` runs at session start when `~/.claude/CLAUDE.md` is a symlink into a clone of this repo. It links every file the repo tracks under `claude/common/` and `claude/unix/` that `~/.claude` lacks, and reports files there that are copies, without replacing them. A copy install is left alone. Self-test: `python3 -I hooks/test_armarium_links.py`.
 - `skill-model-invocable <skill>…` runs at session start and removes `disable-model-invocation: true` from the frontmatter of each skill it names. An update such as `npx skills update` puts the line back, and the next session start removes it again. Self-test: `python3 -I hooks/test_skill_model_invocable.py`.
-- `memory-repo-symlink` runs at session start inside a git repo (outside one it does nothing). It moves `~/.claude/projects/<slug>/memory` into `<repo>/.claude/memory` and symlinks it back, so read it before you enable it. Add `**/.claude/memory/` to your global gitignore first, or the notes get committed with the repo. `CLAUDE.md` (Context) keeps each note to one decision with a `status`, so an old choice is marked `replaced` instead of sitting beside the new one.
+- `memory-repo-symlink` runs at session start inside a git repo (outside one it does nothing). It moves `~/.claude/projects/<slug>/memory` into `<repo>/.claude/memory` and symlinks it back, so read it before you enable it. A file whose name the repo already has stays where it is, and the link waits until you have merged it by hand. Self-test: `python3 -I hooks/test_memory_repo_symlink.py`. Add `**/.claude/memory/` to your global gitignore first, or the notes get committed with the repo. `CLAUDE.md` (Context) keeps each note to one decision with a `status`, so an old choice is marked `replaced` instead of sitting beside the new one.
 
 `skills/claude-md-audit` is a user-invoked skill (`/claude-md-audit <session-id>`). It reads a session's transcript and checks it against the config the session ran under. The checks cover:
 
@@ -74,7 +75,7 @@ The files above call out to other projects. None of them are copied here.
 | What | Used by | Where to get it |
 |---|---|---|
 | `jq` | hooks | `brew install jq` |
-| `python3` | `bash-ban-shell-writes`, `agent-no-downgrade`, `flow-skill-check`, `skill-model-invocable`, `armarium-links`, `bin/check` | preinstalled on macOS; your package manager elsewhere |
+| `python3` | `bash-ban-shell-writes`, `agent-no-downgrade`, `flow-skill-check`, `reviewer-gate`, `skill-model-invocable`, `armarium-links`, `bin/check` | preinstalled on macOS; your package manager elsewhere |
 | `rtk` | `settings.example.json` hook, `RTK.md` | `brew install rtk` ([rtk-ai.app](https://www.rtk-ai.app/)) |
 | `codebase-memory-mcp` | cbm hooks, the optional code graph in `CLAUDE.md` | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp), install script in its README |
 | `ponytail` plugin | `settings.example.json` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |

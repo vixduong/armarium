@@ -22,22 +22,24 @@ else
   repo_memory="${repo_root}/.claude/memory"
 fi
 
+# Only act on project dirs Claude Code already created, so no orphan dirs (same as the Windows port).
+[ -d "$(dirname "$projects_memory")" ] || exit 0
 mkdir -p "$repo_memory"
-mkdir -p "$(dirname "$projects_memory")"
 
 # Already correct symlink → done.
 if [ -L "$projects_memory" ] && [ "$(readlink "$projects_memory")" = "$repo_memory" ]; then
   exit 0
 fi
 
-# Existing real dir with contents → move them into repo first.
+# Existing real dir with contents → move them into repo first. Never overwrite a repo file; if anything stays
+# behind, keep the real dir and retry next session.
 if [ -d "$projects_memory" ] && [ ! -L "$projects_memory" ]; then
   shopt -s dotglob nullglob
   files=("$projects_memory"/*)
   if [ ${#files[@]} -gt 0 ]; then
-    mv "${files[@]}" "$repo_memory"/
+    mv -n "${files[@]}" "$repo_memory"/ || true  # GNU mv 9.2+ exits 1 when -n skips a file
   fi
-  rmdir "$projects_memory" 2>/dev/null || true
+  rmdir "$projects_memory" 2>/dev/null || exit 0
 fi
 
 # Stale symlink pointing elsewhere → replace.

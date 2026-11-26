@@ -11,7 +11,7 @@
 | `hooks/memory_repo_symlink.py` | `hooks/memory-repo-symlink` (a junction, so no admin rights are needed) |
 | `hooks/codemode_ponytail_band.py` | `hooks/codemode-ponytail-band`; its self-test is `claude/common/hooks/test_codemode_ponytail_band.py`, which runs this port on Windows |
 
-`agent-no-downgrade`, `bash-ban-shell-writes`, `flow-skill-check`, `skill-model-invocable` and `armarium-links` are Python and run as they are, called with `python`.
+`agent-no-downgrade`, `bash-ban-shell-writes`, `flow-skill-check`, `reviewer-gate`, `skill-model-invocable` and `armarium-links` are Python and run as they are, called with `python`. The ones that start `git` find it with `path_only.py`, which reads only the absolute PATH entries, because Windows would otherwise run a `git.exe` from the project folder.
 
 ## Install
 
@@ -26,9 +26,9 @@ Then merge `settings.example.json` into `~\.claude\settings.json` by hand and re
 
 ## Requirements
 
-`python` on PATH (the Python hooks), Git for Windows (the Bash tool), `rtk` (`winget install rtk-ai.rtk`), and optionally `codebase-memory-mcp`. `run_cli_hook.py` also looks in `~\.local\bin`, `~\.cargo\bin`, `%APPDATA%\npm`, scoop shims and the WinGet links folder. Self-tests: `python -I ~\.claude\hooks\test_agent_no_downgrade.py`, `test_bash_ban_shell_writes.py`, `test_codemode_ponytail_band.py`, `test_flow_skill_check.py`, `test_skill_model_invocable.py`, `test_armarium_links.py`, `test_bash_ban_raw_tools.py`, `test_cbm_session_reminder.py`, `test_memory_repo_symlink.py` and `test_statusline.py`. `armarium-links` stays silent after `install.ps1`, which copies rather than links. `test_armarium_links.py` creates symlinks, which Windows allows only with Developer Mode on or from an elevated shell.
+`python` on PATH (the Python hooks), Git for Windows (the Bash tool), `rtk` (`winget install rtk-ai.rtk`), and optionally `codebase-memory-mcp`. `run_cli_hook.py` also looks in `~\.local\bin`, `~\.cargo\bin`, `%APPDATA%\npm`, scoop shims and the WinGet links folder. Self-tests: `python -I ~\.claude\hooks\test_agent_no_downgrade.py`, `test_bash_ban_shell_writes.py`, `test_codemode_ponytail_band.py`, `test_flow_skill_check.py`, `test_reviewer_gate.py`, `test_skill_model_invocable.py`, `test_armarium_links.py`, `test_bash_ban_raw_tools.py`, `test_cbm_session_reminder.py`, `test_memory_repo_symlink.py` and `test_statusline.py`. `armarium-links` stays silent after `install.ps1`, which copies rather than links. `test_armarium_links.py` creates symlinks, which Windows allows only with Developer Mode on or from an elevated shell.
 
 ## Known gaps
 
-- `bash-ban-shell-writes` keys its 10-minute unlock file on the parent PID under `/tmp`, while `bash-ban-raw-tools.py` uses `%TEMP%\bash-raw-unlock-<pid>`. The two unlocks are separate on Windows. Both take the PID from `os.getppid()`, which is the `python` launcher's when `python` is a launcher (uv, py).
+- `bash-ban-shell-writes` and `bash-ban-raw-tools.py` share the 10-minute unlock file `%TEMP%\bash-raw-unlock-<pid>`. Both take the PID from `os.getppid()`, which is the `python` launcher's when `python` is a launcher (uv, py).
 - Every hook is Python: a PowerShell start cost 0.3 to 0.9 s (measured) where the macOS hooks start bash, and the session-start hooks ran in parallel with the slowest setting the wait. `cbm_session_reminder.py`: `hook-augment` takes about 2 s, so a stale cache is replayed at once and refreshed in the background, and the graph context can lag one index behind.

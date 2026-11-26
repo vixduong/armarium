@@ -21,6 +21,11 @@ BLOCK = [
     "FOO=1 echo x > f",
     "rtk proxy echo x > f",
     "tr a b <<EOF > f\nx\nEOF",
+    "echo x 1> out.py",
+    "echo x >| out.py",
+    "printf x &> out.py",
+    "sed -n p src.py \\>| tee dst.py",  # an escaped > is a word, so this | is a pipe
+    "cat <<< \"x\"\nsed -i 's/a/b/' f",  # a here-string opens no heredoc body
 ]
 ALLOW = [
     "ls -la",
@@ -37,6 +42,9 @@ ALLOW = [
     "jq -r .x f.json | tee /dev/null",
     "cat file.txt",
     "claude -p \"$Q\" < /dev/null > out.jsonl 2>&1",
+    "cat <<< \"x\"",
+    "make check &> /tmp/check.log",
+    "echo hi 1>&2",
     "",
 ]
 

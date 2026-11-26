@@ -5,7 +5,8 @@
 # sed -i, perl -i, tee, a python script fed on stdin). CLAUDE.md: write files with Edit/Write only.
 # Added 2026-11-15: eval run 2 (docs/rule-origins.md in armarium) measured 5/8 compliance with the prose rule and 0 blocks by any hook.
 # Allowed on purpose: heredoc into a command (git commit -F -), log redirects (make check > log 2>&1),
-# fd redirects, /dev/null. Escape hatch (same as bash-ban-raw-tools): touch /tmp/bash-raw-unlock-$PPID.
+# fd redirects, /dev/null. Escape hatch (same file as bash-ban-raw-tools): touch /tmp/bash-raw-unlock-$PPID,
+# on Windows %TEMP%\bash-raw-unlock-<parent pid>.
 # Self-test: python3 -I ~/.claude/hooks/test_bash_ban_shell_writes.py
 import json, os, re, sys, time
 
@@ -19,7 +20,7 @@ if data.get("tool_name") != "Bash":
 # their only write path, so no file write is allowed, log redirects and the unlock file included.
 READ_ONLY = {"reviewer", "oracle"}
 agent = data.get("agent_type") or ""
-unlock = "/tmp/bash-raw-unlock-%d" % os.getppid()
+unlock = os.path.join(os.environ.get("TEMP") or "/tmp" if os.name == "nt" else "/tmp", "bash-raw-unlock-%d" % os.getppid())
 try:
     if agent not in READ_ONLY and 0 <= time.time() - os.stat(unlock).st_mtime < 600:
         sys.exit(0)
@@ -36,21 +37,22 @@ for line in cmd.split("\n"):
             delim = None
         continue
     kept.append(line)
-    m = re.search(r"<<-?\s*['\"]?(\w+)['\"]?", line)
+    m = re.search(r"(?<!<)<<(?!<)-?\s*['\"]?(\w+)['\"]?", line)  # not a here-string (<<<): it has no body
     if m:
         delim = m.group(1)
 text = "\n".join(kept)
 # Quoted strings are data too (commit messages, sed scripts).
 text = re.sub(r"'[^']*'", "''", text)
 text = re.sub(r'"[^"]*"', '""', text)
+text = re.sub(r"(?<!\\)>\|", ">", text)  # noclobber override: the same write, and its | is no pipe
 
 SAFE = {"/dev/null", "/dev/stderr", "/dev/stdout"}
 WRITERS = {"echo", "printf", "cat"}
 
 
 def file_targets(seg):
-    # `> f` / `>> f`, not fd redirects (2>, &>, >&2)
-    return [t for t in re.findall(r"(?<![0-9&>])>>?\s*([^\s&|;<>]+)", seg) if t not in SAFE and not t.startswith("&")]
+    # stdout into a file: `> f`, `>> f`, `1> f`, `&> f`; not other fds (2> f) or fd copies (>&2, 2>&1)
+    return [t for t in re.findall(r"(?<![02-9>])>>?\s*([^\s&|;<>]+)", seg) if t not in SAFE and not t.startswith("&")]
 
 
 GIT_WRITES = {"checkout", "switch", "stash", "commit", "reset", "add", "rm", "mv", "merge", "rebase", "push",

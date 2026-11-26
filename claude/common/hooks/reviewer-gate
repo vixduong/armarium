@@ -11,6 +11,7 @@
 # Self-test: python3 -I ~/.claude/hooks/test_reviewer_gate.py
 import json, os, re, subprocess, sys
 from datetime import datetime
+from path_only import which
 
 DOCS = (".md", ".markdown", ".txt", ".rst")
 REVIEW_IN_CODE = re.compile(r"""subagent_type\s*:\s*['"]reviewer['"]|skill\s*:\s*['"](?:[\w-]+:)?code-review['"]""")
@@ -23,7 +24,7 @@ def key(p): return os.path.normcase(os.path.realpath(p))  # git and transcript a
 
 def git_changes(cwd, since):
     """{key(path): changed lines} for non-doc files in cwd's work tree modified at or after `since` (epoch s)."""
-    def git(*a): return subprocess.run(["git", "-C", cwd, *a], capture_output=True, timeout=3).stdout.decode("utf-8", "replace")
+    def git(*a): return subprocess.run([which("git"), "-C", cwd, *a], capture_output=True, timeout=3).stdout.decode("utf-8", "replace")
     top = git("rev-parse", "--show-toplevel").strip()
     if not top:
         return {}
@@ -114,7 +115,7 @@ try:
     origin_head = False
     if sec_reviewer and not sec_skill and data.get("cwd"):
         try:
-            origin_head = subprocess.run(["git", "-C", data["cwd"], "rev-parse", "--verify", "--quiet", "origin/HEAD"],
+            origin_head = subprocess.run([which("git"), "-C", data["cwd"], "rev-parse", "--verify", "--quiet", "origin/HEAD"],
                                          capture_output=True, timeout=3).returncode == 0
         except (OSError, subprocess.SubprocessError):
             pass

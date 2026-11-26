@@ -135,5 +135,15 @@ with tempfile.TemporaryDirectory() as repo:
     if blocked(r): fails += 1; print("FAIL a UI file dirty from before the turn does not count", r)
 r = run(turn(CODE_FLOW), cwd="/nonexistent-dir")
 if blocked(r): fails += 1; print("FAIL cwd that is not a repo", r)
-print("FAILS", fails, "of", len(CASES) + 14)
+# Windows starts a bare program name from the cwd (the user's project) before PATH; PATH=. gives the same lookup here.
+if os.name != "nt":
+    with tempfile.TemporaryDirectory() as proj:
+        with open(os.path.join(proj, "git"), "w") as f: f.write("#!/bin/sh\n: > ran\n")
+        os.chmod(os.path.join(proj, "git"), 0o755)
+        t = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+        t.write("\n".join(json.dumps(x) for x in turn(CODE_FLOW))); t.close()
+        subprocess.run([sys.executable, HOOK], input=json.dumps({"transcript_path": t.name, "cwd": proj}), capture_output=True,
+                       text=True, encoding="utf-8", cwd=proj, env=dict(ENV, PATH="."))
+        if os.path.exists(os.path.join(proj, "ran")): fails += 1; print("FAIL the UI check ran a git from the cwd")
+print("FAILS", fails, "of", len(CASES) + 15)
 sys.exit(1 if fails else 0)

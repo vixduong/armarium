@@ -90,20 +90,14 @@ fi
 five_seg=""; [ -n "$five" ] && five_seg="${D}5h${Z} $(pct_color "$five")$(printf '%.0f' "$five")%${Z}"
 week_seg=""; [ -n "$week" ] && week_seg="${D}7d${Z} $(pct_color "$week")$(printf '%.0f' "$week")%${Z}"
 
-# Ponytail mode: the plugin's hooks write the level to this flag file
-ponytail=$(head -n1 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.ponytail-active" 2>/dev/null | tr -d '[:space:]')
-pony_seg=""; [ -n "$ponytail" ] && pony_seg="${B}${G}ponytail:${ponytail}${Z}"
-
 # Blocks
 blk_project=$(joinby "$DOT" "$folder" "$branch_seg")
 blk_model=$(joinby "$DOT" "$model_seg" "$effort_seg")
 blk_ctx="$ctx_seg"
 blk_tokens=$(joinby "$DOT" "$in_seg" "$out_seg" "$cache_seg" "$write_seg" "$hit_seg" "$idle_seg" "$cost_seg")
 blk_limits=$(joinby "$DOT" "$five_seg" "$week_seg")
-blk_pony="$pony_seg"
 
 row1=$(joinby "$BAR" "$blk_project" "$blk_model" "$blk_ctx")
-# row2=$(joinby "$BAR" "$blk_tokens" "$blk_limits" "$blk_pony")
 row2=$(joinby "$BAR" "$blk_tokens" "$blk_limits")
 
 [ -n "$row1" ] && printf '%s\n' "$row1"

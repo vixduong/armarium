@@ -126,5 +126,16 @@ r = run([asst(FLOW, write("/r/index.html", 250)), LIST_PROMPT, asst(FLOW), asst(
 if blocked(r): fails += 1; print("FAIL a prompt with an image starts a new turn: %s" % (r,))
 r = run(REPL_TURN, cwd="/nonexistent-dir")
 if blocked(r) or r[0] != 0: fails += 1; print("FAIL cwd that is not a repo: %s" % (r,))
+# Windows starts a bare program name from the cwd (the user's project) before PATH; PATH=. gives the same lookup here.
+if os.name != "nt":
+    for name, records in (("change count", REPL_TURN), ("origin/HEAD check", [prompt("go", T0), asst(sec_agent()), asst(text("done"))])):
+        with tempfile.TemporaryDirectory() as proj:
+            with open(os.path.join(proj, "git"), "w") as f: f.write("#!/bin/sh\n: > ran\n")
+            os.chmod(os.path.join(proj, "git"), 0o755)
+            t = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+            t.write("\n".join(json.dumps(x) for x in records)); t.close()
+            subprocess.run([sys.executable, HOOK], input=json.dumps({"transcript_path": t.name, "cwd": proj}), capture_output=True,
+                           text=True, cwd=proj, env=dict(os.environ, PATH="."))
+            if os.path.exists(os.path.join(proj, "ran")): fails += 1; print("FAIL %s ran a git from the cwd" % name)
 print("ok" if not fails else "%d failed" % fails)
 sys.exit(1 if fails else 0)

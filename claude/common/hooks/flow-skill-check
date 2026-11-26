@@ -8,6 +8,7 @@
 # files the frontend gate's `paths:` cover (commits since the prompt, or dirty files touched since) needs `UI` on its Flow line.
 # Self-test: python3 -I ~/.claude/hooks/test_flow_skill_check.py
 import json, os, re, subprocess, sys
+from path_only import which
 
 SKILLS = os.path.expanduser("~/.claude/skills")
 CALL_IN_CODE = re.compile(r"""skill\s*:\s*['"]([\w:.-]+)['"]""")
@@ -40,7 +41,7 @@ def ui_changes(cwd, since):
     with open(FRONTEND, encoding="utf-8") as f:
         m = re.search(r"\{([\w,]+)\}", f.read().split("---")[1])  # paths: "**/*.{tsx,jsx,...}"
     exts = tuple("." + e for e in m.group(1).split(",")) if m else ()
-    def git(*a): return subprocess.run(["git", "-C", cwd, *a], capture_output=True, timeout=3).stdout.decode("utf-8", "replace")
+    def git(*a): return subprocess.run([which("git"), "-C", cwd, *a], capture_output=True, timeout=3).stdout.decode("utf-8", "replace")
     top = git("rev-parse", "--show-toplevel").strip()
     if not exts or not top:
         return []
