@@ -1,5 +1,5 @@
 """Self-test for the Windows Python hooks bash-ban-raw-tools.py and run_cli_hook.py:
-python -I windows/hooks/test_bash_ban_raw_tools.py"""
+python -I claude/windows/hooks/test_bash_ban_raw_tools.py"""
 import json, os, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))

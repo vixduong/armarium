@@ -1,15 +1,11 @@
-# Overlay claude/ then windows/ onto ~/.claude. Dry run unless -Apply; every file it replaces is backed up first.
+# Overlay claude/common/ then claude/windows/ onto ~/.claude (claude/unix/ is macOS and Linux only). Dry run unless -Apply; every file it replaces is backed up first.
 # Never touches settings.json or settings.local.json: merge settings.example.json by hand. skills/ gets only the repo's own skills; other skills on the machine stay.
 param([switch]$Apply)
 $ErrorActionPreference = 'Stop'
-$repo = Split-Path $PSScriptRoot
+$claude = Split-Path $PSScriptRoot
 $dest = Join-Path $env:USERPROFILE '.claude'
 $bak  = Join-Path $dest ("backups\armarium-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 
-# claude/ items that need bash or macOS, or that Windows replaces from windows/
-$skip = 'settings.example.json', 'statusline-command.sh',
-        'bash-ban-raw-tools', 'run-cli-hook', 'cbm-session-reminder',
-        'memory-repo-symlink', 'codemode-ponytail-band'
 # CLAUDE.md lines that assume macOS/zsh; each must match once, or the repo text has drifted
 $patch = @(
   @('~/.local/bin/codebase-memory-mcp cli', 'codebase-memory-mcp cli'),
@@ -18,17 +14,15 @@ $patch = @(
   @('- **RTK**: Bash runs as', '- **RTK**: Bash and PowerShell run as')
 )
 
-$files = foreach ($root in 'claude', 'windows') {
-  $base = Join-Path $repo $root
+$files = foreach ($root in 'common', 'windows') {
+  $base = Join-Path $claude $root
   Get-ChildItem $base -Recurse -File | Where-Object {
     $rel = $_.FullName.Substring($base.Length + 1)
-    $parts = $rel -split '\\'
-    -not ($parts -contains '__pycache__') -and
-    -not ($root -eq 'windows' -and ($rel -in 'install.ps1', 'README.md', 'settings.example.json')) -and
-    -not ($root -eq 'claude' -and ($parts | Where-Object { $_ -in $skip }))
+    -not (($rel -split '\\') -contains '__pycache__') -and
+    -not ($root -eq 'windows' -and ($rel -in 'install.ps1', 'README.md', 'settings.example.json'))
   } | ForEach-Object { [pscustomobject]@{ Src = $_.FullName; Rel = $_.FullName.Substring($base.Length + 1) } }
 }
-# windows/ wins over claude/ for the same relative path
+# windows/ wins over common/ for the same relative path
 $files = $files | Group-Object Rel | ForEach-Object { $_.Group[-1] }
 
 function Get-Wanted($f) {

@@ -16,23 +16,32 @@ My Claude Code setup in one repo: a global `CLAUDE.md`, `settings.json`, hooks, 
 ## What is inside
 
 ```
-claude/                      mirrors ~/.claude
-├── CLAUDE.md                the rules
-├── CODING_STANDARDS.md      judgement calls a linter cannot make
-├── RTK.md                   how to read condensed command output
-├── agent-tuning.md          why each agent has its model and effort
-├── settings.example.json    opt-in: env, permissions, hooks, plugins, models
-├── statusline-command.sh    status line: tokens, cost, limits
-├── agents/                  oracle, reviewer, worker, tester, explorer,
-│                            researcher, evidence-auditor
-├── hooks/                   see below
-├── rules/                   frontend.md, video.md (stack gates)
-├── skills/claude-md-audit/  audits how this config steered a session
-└── bin/                     sync-runner-tools.mjs, sync-copilot.mjs
+claude/                      common/ plus one OS overlay mirrors ~/.claude
+├── common/                  every OS
+│   ├── CLAUDE.md            the rules
+│   ├── CODING_STANDARDS.md  judgement calls a linter cannot make
+│   ├── RTK.md               how to read condensed command output
+│   ├── agent-tuning.md      why each agent has its model and effort
+│   ├── agents/              oracle, reviewer, worker, tester, explorer,
+│   │                        researcher, evidence-auditor
+│   ├── hooks/               the Python hooks; see below
+│   ├── rules/               frontend.md, video.md (stack gates)
+│   ├── skills/claude-md-audit/  audits how this config steered a session
+│   └── bin/                 sync-runner-tools.mjs, sync-copilot.mjs
+├── unix/                    macOS and Linux
+│   ├── settings.example.json    opt-in: env, permissions, hooks, plugins, models
+│   ├── statusline-command.sh    status line: tokens, cost, limits
+│   └── hooks/               the bash hooks; see below
+└── windows/                 PowerShell hooks, status line, settings and installer; see claude/windows/README.md
+pi/                          the same rule set for the pi coding agent
+├── common/
+│   ├── AGENTS.md            the rules, in pi's tool, agent and skill names
+│   └── settings.example.json    opt-in: packages, skills, models, subagent tiers
+├── unix/install.sh          links AGENTS.md and the shared docs into ~/.pi/agent
+└── windows/install.ps1      copies them there
 bin/check                    repo gate: self-tests and config checks; .githooks/pre-commit runs it
 docs/
 └── rule-origins.md          the incident and evidence behind each rule
-windows/                     PowerShell hooks, status line, settings and installer; see windows/README.md
 ```
 
 Hooks (each runs only once its entry from `settings.example.json` is in your `settings.json`):
@@ -44,7 +53,7 @@ Hooks (each runs only once its entry from `settings.example.json` is in your `se
 - `run-cli-hook` finds a CLI such as `rtk` when the hook environment has no PATH, and exits 0 if it is not installed.
 - `cbm-session-reminder` adds `codebase-memory-mcp` graph context when a session starts, cached per folder until an index changes; a notice such as "no CBM daemon" is shown but never cached. It does nothing if the binary is missing. Self-test: `python3 -I hooks/test_cbm_session_reminder.py`.
 - `codemode-ponytail-band` runs at session start when `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`. Code Mode falls back to ordinary tools while a plugin's JS mod checks tool calls, and ponytail ships one (`hooks/claude-band.json`). Removing that entry from the cached `plugin.json` lets Code Mode start; a ponytail update puts it back, and this hook says so. Self-test: `python3 -I hooks/test_codemode_ponytail_band.py`.
-- `armarium-links` runs at session start when `~/.claude/CLAUDE.md` is a symlink into a clone of this repo. It links every file the repo tracks under `claude/` that `~/.claude` lacks, and reports files there that are copies, without replacing them. A copy install is left alone. Self-test: `python3 -I hooks/test_armarium_links.py`.
+- `armarium-links` runs at session start when `~/.claude/CLAUDE.md` is a symlink into a clone of this repo. It links every file the repo tracks under `claude/common/` and `claude/unix/` that `~/.claude` lacks, and reports files there that are copies, without replacing them. A copy install is left alone. Self-test: `python3 -I hooks/test_armarium_links.py`.
 - `skill-model-invocable <skill>…` runs at session start and removes `disable-model-invocation: true` from the frontmatter of each skill it names. An update such as `npx skills update` puts the line back, and the next session start removes it again. Self-test: `python3 -I hooks/test_skill_model_invocable.py`.
 - `memory-repo-symlink` runs at session start inside a git repo (outside one it does nothing). It moves `~/.claude/projects/<slug>/memory` into `<repo>/.claude/memory` and symlinks it back, so read it before you enable it. Add `**/.claude/memory/` to your global gitignore first, or the notes get committed with the repo. `CLAUDE.md` (Context) keeps each note to one decision with a `status`, so an old choice is marked `replaced` instead of sitting beside the new one.
 
@@ -102,7 +111,7 @@ Back up `~/.claude` first.
 ```bash
 git clone https://github.com/vixduong/armarium.git
 cd armarium
-cp -Ri claude/. ~/.claude/
+cp -Ri claude/common/. claude/unix/. ~/.claude/
 ```
 
 `-i` asks before each overwrite. The copy leaves your `settings.json` alone: the repo ships only `settings.example.json`, so nothing changes your permissions until you choose to. Then install the requirements above.
@@ -110,8 +119,12 @@ cp -Ri claude/. ~/.claude/
 To follow the repo instead of copying it, link each file and enable the `armarium-links` hook, which links files added later. The loop skips a file that already exists in `~/.claude`, so move yours aside first if you want the repo's version:
 
 ```bash
-git ls-files claude | grep -v settings.example.json | while read f; do d=~/.claude/${f#claude/}; mkdir -p "$(dirname "$d")"; [ -e "$d" ] || ln -s "$PWD/$f" "$d"; done
+git ls-files claude/common claude/unix | grep -v settings.example.json | while read f; do d=~/.claude/${f#claude/*/}; mkdir -p "$(dirname "$d")"; [ -e "$d" ] || ln -s "$PWD/$f" "$d"; done
 ```
+
+### Pi
+
+[pi](https://github.com/earendil-works/pi) loads `~/.pi/agent/AGENTS.md` as global instructions. `pi/common/AGENTS.md` carries the same Route table and flows as `claude/common/CLAUDE.md`, written for pi's tools, the `pi-subagents` agents and the skills under `~/.agents/skills`. Run `pi/unix/install.sh`, or `pi\windows\install.ps1 -Apply` on Windows. Either one also installs `CODING_STANDARDS.md`, `RTK.md` and `rules/` from `claude/common/`, the files the rules point to. Existing files are not overwritten: `install.sh` reports and skips them, and `install.ps1` backs them up before it replaces them. `settings.example.json` is this machine's `settings.json` minus per-machine state. Merge the parts you want by hand and replace `/Users/YOU`. Pi runs none of the Claude Code hooks, so the rules they enforce depend on the model alone.
 
 Before you commit here, run `git config core.hooksPath .githooks` once, so `bin/check` runs on each commit.
 

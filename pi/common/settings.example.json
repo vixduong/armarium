@@ -1,0 +1,90 @@
+{
+  "theme": "light/dark",
+  "defaultTools": [
+    "+codemode"
+  ],
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4.1-flash",
+  "defaultThinkingLevel": "high",
+  "packages": [
+    {
+      "source": "git:github.com/DietrichGebert/ponytail",
+      "skills": [
+        "!ponytail-gain",
+        "!ponytail-help",
+        "!ponytail-debt"
+      ]
+    },
+    "npm:pi-subagents",
+    "npm:pi-web-access",
+    "npm:pi-context-view",
+    "npm:context-mode",
+    "git:github.com/blader/humanizer",
+    "git:github.com/dmmulroy/pi-claude-cli"
+  ],
+  "skills": [
+    "!codebase-design",
+    "!remotion-best-practices",
+    "!tavily-search",
+    "!tavily-research",
+    "!grill-with-docs",
+    "!improve-codebase-architecture",
+    "!implement-spec",
+    "!to-questionnaire",
+    "!triage"
+  ],
+  "subagents": {
+    "defaultProvider": "opencode-go",
+    "defaultModel": "deepseek-v4.1-flash",
+    "defaultThinking": "high",
+    "agentOverrides": {
+      "scout": {
+        "model": "pi-claude-cli/claude-haiku-5-5",
+        "thinking": "medium"
+      },
+      "researcher": {
+        "model": "pi-claude-cli/claude-haiku-5-5",
+        "thinking": "medium",
+        "subagentOnlyExtensions": [
+          "/Users/YOU/.pi/agent/npm/node_modules/pi-web-access/dist/index.js"
+        ]
+      },
+      "worker": {
+        "model": "pi-claude-cli/claude-sonnet-5-5",
+        "thinking": "medium"
+      },
+      "evidence-auditor": {
+        "model": "pi-claude-cli/claude-sonnet-5-5",
+        "thinking": "medium",
+        "subagentOnlyExtensions": [
+          "/Users/YOU/.pi/agent/npm/node_modules/pi-web-access/dist/index.js"
+        ]
+      },
+      "reviewer": {
+        "model": "pi-claude-cli/claude-sonnet-5-5",
+        "thinking": "high"
+      },
+      "oracle": {
+        "model": "pi-claude-cli/claude-fable-5-1",
+        "thinking": "medium"
+      }
+    }
+  },
+  "tuiMode": "fullscreen",
+  "enabledModels": [
+    "opencode-go/deepseek-v4.1-flash",
+    "opencode/deepseek-v4.1-flash",
+    "deepseek/deepseek-flash",
+    "opencode-go/glm-5.3-flash",
+    "opencode/glm-5.3-flash",
+    "opencode-go/hy4-flash-free",
+    "opencode/gpt-6-astra",
+    "pi-claude-cli/claude-haiku-5-5",
+    "pi-claude-cli/claude-sonnet-5-5",
+    "pi-claude-cli/claude-opus-5-5",
+    "pi-claude-cli/claude-fable-5-1"
+  ],
+  "steeringMode": "one-at-a-time",
+  "editorPaddingX": 1,
+  "showHardwareCursor": false
+}

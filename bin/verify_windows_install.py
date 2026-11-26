@@ -1,4 +1,4 @@
-"""Checks this machine after `windows/install.ps1 -Apply` + the settings merge. Run by hand: the name has no test_ prefix, so bin/check skips it (it reads ~/.claude).
+"""Checks this machine after `claude/windows/install.ps1 -Apply` + the settings merge. Run by hand: the name has no test_ prefix, so bin/check skips it (it reads ~/.claude).
 python -I bin/verify_windows_install.py [settings.json]   # default ~/.claude/settings.json"""
 import json, os, re, shutil, subprocess, sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -47,7 +47,7 @@ if not os.path.islink(os.path.join(DOT, "CLAUDE.md")):
 
 # the installer has nothing left to do
 ps = shutil.which("pwsh") or shutil.which("powershell")
-p = subprocess.run([ps, "-NoProfile", "-File", os.path.join(REPO, "windows", "install.ps1")], capture_output=True, text=True)
+p = subprocess.run([ps, "-NoProfile", "-File", os.path.join(REPO, "claude", "windows", "install.ps1")], capture_output=True, text=True)
 check("install.ps1 dry run: no new/replace left", p.returncode == 0 and not re.search(r"^(new|replace)\s", p.stdout, re.M))
 
 print("FAILS %d" % len(failed) if failed else "all passed")

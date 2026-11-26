@@ -4,7 +4,7 @@ Checks: graph context is cached and replayed; a "no CBM daemon" notice is passed
 and an old cached notice is ignored."""
 import json, os, subprocess, sys, tempfile
 
-if sys.platform == "win32":  # Windows runs windows/hooks/cbm_session_reminder.py (own test there), not this bash hook
+if sys.platform == "win32":  # Windows runs claude/windows/hooks/cbm_session_reminder.py (own test there), not this bash hook
     print("skip on Windows"); sys.exit(0)
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cbm-session-reminder")
 GRAPH = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "[codebase-memory] graph"}})

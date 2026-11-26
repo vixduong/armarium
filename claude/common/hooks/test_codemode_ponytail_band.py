@@ -2,10 +2,12 @@
 Builds a fake HOME with a ponytail install record, so the real plugin cache is never read or changed."""
 import json, os, subprocess, sys, tempfile
 
-HOOK = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "codemode-ponytail-band")]  # beside this test
-if sys.platform == "win32":  # the Windows hook is Python: beside this test once installed, else in this repo's windows/hooks
-    here = os.path.dirname(os.path.abspath(__file__))
+# the hook beside this test once installed, else in this repo's claude/unix/hooks (claude/windows/hooks on Windows, a Python port)
+here = os.path.dirname(os.path.abspath(__file__))
+if sys.platform == "win32":
     HOOK = [sys.executable, next(p for p in (os.path.join(here, "codemode_ponytail_band.py"), os.path.join(here, "..", "..", "windows", "hooks", "codemode_ponytail_band.py")) if os.path.exists(p))]
+else:
+    HOOK = [next(p for p in (os.path.join(here, "codemode-ponytail-band"), os.path.join(here, "..", "..", "unix", "hooks", "codemode-ponytail-band")) if os.path.exists(p))]
 
 
 def run(hooks_field, code_mode, registered=True):

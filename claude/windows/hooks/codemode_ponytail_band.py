@@ -2,7 +2,7 @@
 # SessionStart, Windows (Python port of codemode-ponytail-band.ps1: no PowerShell start, about 0.3 s less). Warn when Code Mode is on
 # but ponytail's band mod is registered again. The band (a JS mod that checks tool calls) makes Code Mode fall back to ordinary
 # tools; a ponytail update restores it. Fail-open: any missing file or tool -> silent exit 0.
-# Self-test: python -I test_codemode_ponytail_band.py (in claude/hooks)
+# Self-test: python -I test_codemode_ponytail_band.py (in claude/common/hooks)
 import json, os, sys
 
 

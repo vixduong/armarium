@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Gate for this repo: bin/check [repo]. Runs every self-test and the static checks below; exit 1 on any problem.
-- JSON: both settings.example.json files parse.
-- Settings: every ~/.claude/... path a setting calls exists in claude/; hooks are executable.
-- Pointers: every `~/.claude/<file>` in claude/**/*.md exists in claude/ or ~/.claude; every bare `<name>.md` exists in claude/.
+Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows/ each overlay it onto ~/.claude.
+- JSON: every settings.example.json (claude/unix, claude/windows, pi/common) parses.
+- Settings: every ~/.claude/... path a setting calls exists in its OS dir or common/; unix hooks are executable.
+- Pointers: every `~/.claude/<file>` in common/ and unix/ *.md exists there or in ~/.claude; every bare `<name>.md` exists there.
 - Names: every Route lead-skill name, and every `plugin:skill` of an installed plugin, is an installed skill, an agent or built in;
   a plugin the settings declare but this machine lacks is skipped.
-- Exec: a windows/ hook never starts a bare program name (Windows searches the cwd, the user's project, first).
+- Exec: a claude/windows/ hook never starts a bare program name (Windows searches the cwd, the user's project, first).
   Reads list/tuple argv, also as the left side of +; os.system, shell=True strings and argv held in a variable are not read.
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
   unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
@@ -13,7 +14,10 @@ Self-test: python3 -I bin/test_check.py"""
 import ast, glob, json, ntpath, os, re, subprocess, sys
 
 REPO = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), ".."))
-CLAUDE = os.path.join(REPO, "claude")
+CLAUDE = os.path.join(REPO, "claude", "common")
+UNIX = os.path.join(REPO, "claude", "unix")
+WINDOWS = os.path.join(REPO, "claude", "windows")
+UNIX_SETTINGS, WINDOWS_SETTINGS = "claude/unix/settings.example.json", "claude/windows/settings.example.json"
 HOME_DOT = os.path.expanduser("~/.claude")
 PROJECT_FILES = {"CLAUDE.md", "AGENTS.md", "SKILL.md", "README.md", "GLOSSARY.md", "architecture.md"}  # live in other repos
 problems = []
@@ -26,7 +30,9 @@ def rel(p):
 # Self-tests
 tests = sorted(glob.glob(os.path.join(CLAUDE, "hooks", "test_*.py")) + glob.glob(os.path.join(REPO, "bin", "test_*.py"))
                + glob.glob(os.path.join(CLAUDE, "skills", "*", "scripts", "test_*.py"))
-               + glob.glob(os.path.join(REPO, "windows", "hooks", "test_*.py")))
+               + glob.glob(os.path.join(UNIX, "hooks", "test_*.py"))
+               + glob.glob(os.path.join(WINDOWS, "hooks", "test_*.py"))
+               + glob.glob(os.path.join(REPO, "pi", "*", "test_*.py")))
 for t in tests:
     p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True)
     if p.returncode:
@@ -34,10 +40,10 @@ for t in tests:
 
 # JSON
 settings = {}  # file -> parsed settings
-for f in ["claude/settings.example.json", "windows/settings.example.json"]:
+for f in [UNIX_SETTINGS, WINDOWS_SETTINGS, "pi/common/settings.example.json"]:
     path = os.path.join(REPO, f)
     if not os.path.exists(path):
-        if f.startswith("claude/"):
+        if f == UNIX_SETTINGS:
             problems.append("%s is missing" % f)
         continue
     try:
@@ -61,7 +67,9 @@ def strings(x):
 
 unlocked = set()
 for f, data in settings.items():
-    homes = ["claude"] if f.startswith("claude/") else ["windows", "claude"]  # the Windows overlay falls back to claude/
+    if f.startswith("pi/"):  # pi settings call no ~/.claude path
+        continue
+    homes = ["claude/unix" if f == UNIX_SETTINGS else "claude/windows", "claude/common"]  # each OS overlay falls back to common/
     for s in strings(data):
         words = s.split()
         for i, w in enumerate(words):
@@ -71,22 +79,22 @@ for f, data in settings.items():
             target = next((os.path.join(REPO, h, m.group(1)) for h in homes if os.path.exists(os.path.join(REPO, h, m.group(1)))), None)
             if target is None:
                 problems.append("%s calls %s, which %s lacks" % (f, w, " or ".join(h + "/" for h in homes)))
-            elif f.startswith("claude/") and m.group(1).startswith("hooks/") and not os.access(target, os.X_OK):
+            elif f == UNIX_SETTINGS and m.group(1).startswith("hooks/") and not os.access(target, os.X_OK):
                 problems.append("%s is not executable" % rel(target))
-            if f.startswith("claude/") and w.endswith("/skill-model-invocable"):
+            if f == UNIX_SETTINGS and w.endswith("/skill-model-invocable"):
                 unlocked.update(words[i + 1:])
 
 # Pointers
-names_in_repo = {os.path.basename(p) for p in glob.glob(os.path.join(CLAUDE, "**", "*"), recursive=True)}
-for md in glob.glob(os.path.join(CLAUDE, "**", "*.md"), recursive=True):
+names_in_repo = {os.path.basename(p) for d in (CLAUDE, UNIX) for p in glob.glob(os.path.join(d, "**", "*"), recursive=True)}
+for md in [p for d in (CLAUDE, UNIX) for p in glob.glob(os.path.join(d, "**", "*.md"), recursive=True)]:
     with open(md, encoding="utf-8") as fh:
         text = fh.read()
     for path in set(re.findall(r"~/\.claude/([\w./-]+\.\w+)", text)):
-        if not (os.path.exists(os.path.join(CLAUDE, path)) or os.path.exists(os.path.join(HOME_DOT, path))):
+        if not any(os.path.exists(os.path.join(d, path)) for d in (CLAUDE, UNIX, HOME_DOT)):
             problems.append("%s points to ~/.claude/%s, which does not exist" % (rel(md), path))
     for name in set(re.findall(r"`([\w.-]+\.md)`", text)):
         if name not in names_in_repo and name not in PROJECT_FILES:
-            problems.append("%s points to %s, which claude/ lacks" % (rel(md), name))
+            problems.append("%s points to %s, which claude/common/ and claude/unix/ lack" % (rel(md), name))
 
 # Skills the model is told to call
 FRONT = re.compile(r"---\r?\n.*?\r?\n---\r?\n", re.S)  # same frontmatter rule as hooks/skill-model-invocable
@@ -165,8 +173,8 @@ for md in [os.path.join(CLAUDE, "CLAUDE.md")] + glob.glob(os.path.join(CLAUDE, "
                 problems.append("%s tells the model to call `%s`, which is user-only: write `/%s`, or unlock it with skill-model-invocable"
                                 % (rel(md), name, full))
 
-# Exec: argv[0] of a subprocess call in a windows/ hook is a full path or a value (resolve(), sys.executable), never a literal name
-for py in glob.glob(os.path.join(REPO, "windows", "**", "*.py"), recursive=True):
+# Exec: argv[0] of a subprocess call in a claude/windows/ hook is a full path or a value (resolve(), sys.executable), never a literal name
+for py in glob.glob(os.path.join(WINDOWS, "**", "*.py"), recursive=True):
     if os.path.basename(py).startswith("test_"):  # tests run in a temp dir, not in the user's project
         continue
     with open(py, encoding="utf-8") as fh:

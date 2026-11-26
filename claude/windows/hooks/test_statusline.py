@@ -1,4 +1,4 @@
-"""Self-test for windows/statusline.py: python -I windows/hooks/test_statusline.py
+"""Self-test for claude/windows/statusline.py: python -I claude/windows/hooks/test_statusline.py
 Expected rows are written by hand from the statusline.ps1 rules (.NET rounding: half away from zero)."""
 import json, os, re, subprocess, sys, tempfile, time
 

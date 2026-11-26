@@ -1,23 +1,23 @@
 # Windows
 
-`windows/` overlays `claude/` for Windows 11 (Git for Windows, Windows PowerShell 5.1 or later). Shared files (CLAUDE.md, agents, rules, the Python hooks and their self-tests) come from `claude/`, so there is one copy to maintain. `settings.example.json` has the same keys and hook set as `claude/settings.example.json`; only the command strings and one matcher differ.
+`claude/windows/` overlays `claude/common/` for Windows 11 (Git for Windows, Windows PowerShell 5.1 or later). Shared files (CLAUDE.md, agents, rules, the Python hooks and their self-tests) come from `claude/common/`, so there is one copy to maintain. `settings.example.json` has the same keys and hook set as `claude/unix/settings.example.json`; only the command strings and one matcher differ.
 
-| Here | Port of (in `claude/`) |
+| Here | Port of (in `claude/unix/`) |
 |---|---|
 | `statusline.py` | `statusline-command.sh` |
 | `hooks/bash-ban-raw-tools.py` | `hooks/bash-ban-raw-tools`; the matcher is `Bash\|PowerShell`, so it also bans `Get-Content`, `Select-String`, `findstr` |
 | `hooks/run_cli_hook.py` | `hooks/run-cli-hook`, for the per-call `rtk hook claude` |
 | `hooks/cbm_session_reminder.py` | `hooks/cbm-session-reminder`; a stale cache is replayed at once and refreshed in the background |
 | `hooks/memory_repo_symlink.py` | `hooks/memory-repo-symlink` (a junction, so no admin rights are needed) |
-| `hooks/codemode_ponytail_band.py` | `hooks/codemode-ponytail-band`; its self-test is `claude/hooks/test_codemode_ponytail_band.py`, which runs this port on Windows |
+| `hooks/codemode_ponytail_band.py` | `hooks/codemode-ponytail-band`; its self-test is `claude/common/hooks/test_codemode_ponytail_band.py`, which runs this port on Windows |
 
 `agent-no-downgrade`, `bash-ban-shell-writes`, `flow-skill-check`, `skill-model-invocable` and `armarium-links` are Python and run as they are, called with `python`.
 
 ## Install
 
 ```powershell
-pwsh windows\install.ps1          # dry run: lists new / replace per file
-pwsh windows\install.ps1 -Apply   # writes; each replaced file is copied to ~\.claude\backups\armarium-<time>\
+pwsh claude\windows\install.ps1          # dry run: lists new / replace per file
+pwsh claude\windows\install.ps1 -Apply   # writes; each replaced file is copied to ~\.claude\backups\armarium-<time>\
 ```
 
 The installer rewrites three lines of `CLAUDE.md` that assume macOS and zsh (the `codebase-memory-mcp` path, the shell bullet, the RTK bullet) and stops if one is missing. It copies the repo's own `skills/` (other skills on the machine stay), never touches `settings.json` or `settings.local.json`, and it never deletes: no setting calls the PowerShell hooks an older install left in `~\.claude\hooks` (`bash-ban-raw-tools.ps1`, `cbm-session-reminder.ps1`, `codemode-ponytail-band.ps1`, `memory-repo-symlink.ps1`, `run-cli-hook.ps1`), so delete them by hand.

@@ -1,5 +1,5 @@
 """Self-test for the bash hook bash-ban-raw-tools (pipe rule): python3 -I ~/.claude/hooks/test_bash_ban_raw_tools.py
-On Windows the hook is windows/hooks/bash-ban-raw-tools.py (own test); set TEST_BASH to a Git Bash to run this one there."""
+On Windows the hook is claude/windows/hooks/bash-ban-raw-tools.py (own test); set TEST_BASH to a Git Bash to run this one there."""
 import json, os, shutil, subprocess, sys, tempfile
 
 BASH = os.environ.get("TEST_BASH") or "bash"
