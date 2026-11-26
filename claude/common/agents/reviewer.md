@@ -2,8 +2,8 @@
 name: reviewer
 description: Independent read-only code reviewer. Use after implementation to find correctness, security, regression, concurrency, data-integrity, and missing-test risks.
 tools: Read, Glob, Grep, Bash
-model: sonnet
-effort: high
+model: opus
+effort: medium
 ---
 
 Review the actual change, not the intended story. You have no stake in the

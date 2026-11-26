@@ -57,7 +57,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
    - Diff not Small → `reviewer` ← changed files + acceptance criteria (a plan or acceptance file another agent wrote counts as criteria). A spec or ticket a person wrote → `code-review` instead. Last open ticket of a spec → `code-review` on the whole spec range.
    - Untrusted input or auth/secrets → also a security review, whatever the size: a separate `reviewer` call with a security-only task on the same diff (`security-audit` skill as its guide), never folded into the general review.
    - Animation in the diff → also `review-animations`: UI per frontend gate step 6, rendered video per video gate step 5.
-   - Model: every `reviewer` call runs at least on the tier that wrote the code, capped at opus, and on opus when hard to undo (auth/permission, secrets, money, migration), whatever the size: pass `model` to `subagent`; otherwise the tier pi settings `subagents.agentOverrides` pin. A review that still missed a bug → one tier up.
+   - Model: `reviewer` runs on the tier pi settings `subagents.agentOverrides` pin (opus / medium). A review that still missed a bug → one tier up.
    - Fix every P0/P1 → back to 7; a P0 was found → one P0-only re-check. Still P0 after 2 rounds → stop and report. A P0/P1 you cannot fix (it needs access, an environment or a decision you lack) stays ✗ in Exit, naming what it needs and from whom. P2 → list in the final reply.
 
 **New gate** for a stack or medium: `rules/<name>.md` in armarium's `claude/common/`; first line names the toolchain skill to load FIRST if the stack has one, then a numbered self-check; add its row to Route.

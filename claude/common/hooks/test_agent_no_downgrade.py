@@ -1,5 +1,5 @@
 """Self-test for agent-no-downgrade: python3 -I ~/.claude/hooks/test_agent_no_downgrade.py
-Uses the real agent files in ~/.claude/agents (reviewer=sonnet, worker=sonnet, oracle=fable, explorer=haiku)."""
+Uses the real agent files in ~/.claude/agents (reviewer=opus, worker=sonnet, oracle=fable, explorer=haiku)."""
 import json, os, subprocess, sys
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent-no-downgrade")  # the hook beside this test, not the installed one
@@ -7,12 +7,12 @@ HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent-no-downgr
 BLOCK = [
     {"subagent_type": "reviewer", "model": "haiku"},
     {"subagent_type": "reviewer", "model": "claude-haiku-5-5"},
+    {"subagent_type": "reviewer", "model": "sonnet"},     # below its opus default, and no listed drop
     {"subagent_type": "evidence-auditor", "model": "haiku"},
     {"subagent_type": "oracle", "model": "haiku"},
 ]
 ALLOW = [
     {"subagent_type": "reviewer"},
-    {"subagent_type": "reviewer", "model": "sonnet"},
     {"subagent_type": "reviewer", "model": "opus"},
     {"subagent_type": "reviewer", "model": "claude-fable-5-2"},
     {"subagent_type": "worker", "model": "haiku"},       # listed drop: mechanical edits

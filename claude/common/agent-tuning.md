@@ -6,8 +6,8 @@ Read before changing an agent's `model`/`effort` or overriding it for one call. 
 | Tier | For | Budget |
 |---|---|---|
 | `haiku` | recon, lookup, running known commands — a mistake is cheap to spot, loops are short | main pool |
-| `sonnet` | well-scoped implementation against a spec; routine review | main pool |
-| `opus` | judgment: review of a risk area; work that stays hard even with a clear spec (migration, perf) | main pool |
+| `sonnet` | well-scoped implementation against a spec | main pool |
+| `opus` | judgment: review; work that stays hard even with a clear spec (migration, perf) | main pool |
 | `fable` | one-way doors: major refactor or migration, architecture; long unattended runs; Opus at `high` still falls short | own weekly limit, ~1 call per run |
 
 Effort (`low` → `medium` → `high` → `xhigh` → `max`) buys depth, not knowledge: `xhigh` is waste where `low` answers. Routine work stays in the main pool to protect the Fable limit.
@@ -29,5 +29,5 @@ Checkable batch → run everything at `low`, re-run only the failures at `high`.
 | `tester` | haiku / medium | runs a known command, reads output | sonnet / high: must design the missing test, not just run one | — |
 | `worker` | sonnet / medium | only agent that writes product code | fable: parent flagged the change as architecturally risky | haiku / medium: mechanical, fully specified edits that a test or build checks |
 | `evidence-auditor` | sonnet / medium | checks claims against sources | opus / high: claim decides architecture, security, or licensing | — |
-| `reviewer` | sonnet / high | review is a well-defined, repeated task; the agent's evidence rule (file, line, proof) checks its own findings. `medium` rated a real crash P2 where `high` rated it P1, for +$0.11 (reviewer-cmp, 2026-11-12) | the author's tier, capped at opus / high: the code was written above sonnet (main session on opus, a raised `worker`), so the reviewer never sits below the author; Fable's budget stays with the fable cell. opus / high: a sonnet/high review missed a bug, or the diff is hard to undo as `CLAUDE.md` step 8 lists. fable / xhigh: major data migration, final pre-merge re-check | — |
+| `reviewer` | opus / medium | review is judgment on a diff someone else wrote; the agent's evidence rule (file, line, proof) checks its own findings. Raised from sonnet / high on 2026-11-27 by the owner's choice, not by a measurement: on sonnet, `medium` rated a real crash P2 where `high` rated it P1 (reviewer-cmp, 2026-11-12), so watch for the same on opus | high: an opus/medium review missed a bug, or the diff is hard to undo as `CLAUDE.md` step 8 lists. fable / xhigh: major data migration, final pre-merge re-check | — |
 | `oracle` | fable / medium | judgment with no tool output to lean on; `medium` is enough for a scoped question; the one agent that spends Fable — decisions, not lookups | — | opus / high, else sonnet / high, when the Fable limit is exhausted; say so in the report |
