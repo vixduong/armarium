@@ -1,7 +1,7 @@
 // armarium-pi: loads armarium's pi rules (AGENTS.md) as a context file, its ~/.pi/agent/ pointers resolved to the repo's
 // shared docs; blocks tool calls until the run's `Flow:` line is written; asks the user before destructive or credential commands.
 // Self-test: python3 -I pi/test_armarium_pi.py
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -43,6 +43,26 @@ const RISKY: RegExp[] = [
 // context-mode's tools run shell code outside bash, so their command fields are checked too.
 const SHELL_TOOLS = new Set(["bash", "ctx_execute", "ctx_execute_file", "ctx_batch"]);
 
+// pi-subagents' required-child-extension registry (src/shared/required-child-extensions.js): every child of a registered
+// session loads these files whatever its agent settings say, and a load failure aborts the launch instead of running ungated.
+// shortcut: written straight into the versioned global registry so this package needs no pi-subagents dependency;
+// upgrade to its exported registerRequiredChildExtensions if the package ever takes that dependency.
+const REGISTRY = Symbol.for("pi-subagents.required-child-extensions.v1");
+// requireForAllRunners: pi-subagents refuses a machine placement or an external-CLI runner (they load no pi extension)
+// and keeps the snapshot with the run, so workflow-script, resumed and recovered children stay gated.
+const SELF = Object.freeze({
+	id: "armarium-pi",
+	path: realpathSync(fileURLToPath(import.meta.url)),
+	requireForAllRunners: true as const,
+});
+type Entry = { id: string; path: string; requireForAllRunners?: true };
+const registry = (): Map<string, readonly Entry[]> | undefined => {
+	const root = globalThis as Record<symbol, unknown>;
+	root[REGISTRY] ??= { version: 1, bySession: new Map() };
+	const r = root[REGISTRY] as { version?: unknown; bySession?: unknown };
+	return r.version === 1 && r.bySession instanceof Map ? (r.bySession as Map<string, readonly Entry[]>) : undefined;
+};
+
 const strings = (v: unknown): string[] =>
 	typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : [];
 
@@ -53,7 +73,8 @@ export default function (pi: ExtensionAPI) {
 	let attempts = 0; // assistant messages that called tools with no Flow line yet
 
 	// contextFiles is rebuilt for each run, so read on each run: an edit to AGENTS.md is live without /reload.
-	pi.on("before_agent_start", (event) => {
+	pi.on("before_agent_start", (event, ctx) => {
+		register(ctx);
 		const o = event.systemPromptOptions;
 		if (event.messageType === "user") {
 			flowSeen = false;
@@ -69,6 +90,37 @@ export default function (pi: ExtensionAPI) {
 		o.contextFiles.unshift({ path, content: readFileSync(path, "utf8").replaceAll("~/.pi/agent/", () => shared) });
 	});
 
+	// Registered at session start, since pi-subagents can launch children before any prompt (/run, scheduled runs,
+	// workflow auto-resume); runs and subagent calls refresh it. A host that registered first is kept beside ours.
+	// shortcut: a host calling pi-subagents' registerRequiredChildExtensions after us throws (the key is taken), and a host
+	// that disposes while merged gets its entry back on our restore; switch to that API if this package takes the dependency.
+	let registeredAs: string | undefined;
+	let previous: readonly Entry[] | undefined; // the other host's exact array, restored so its dispose() still matches
+	const unregister = () => {
+		const map = registry();
+		if (map && registeredAs !== undefined && map.get(registeredAs)?.includes(SELF)) {
+			if (previous) map.set(registeredAs, previous);
+			else map.delete(registeredAs);
+		}
+		registeredAs = previous = undefined;
+	};
+	const register = (ctx: { sessionManager: { getSessionId(): string } }) => {
+		// pi-subagents looks a parent up by its session id (parentSessionId); a session-file key is never read.
+		const key = ctx.sessionManager.getSessionId();
+		if (key === registeredAs) return;
+		unregister();
+		const map = registry();
+		if (!map) return;
+		previous = map.get(key);
+		map.set(key, Object.freeze([...(previous ?? []).filter((e) => e.id !== SELF.id), SELF]));
+		registeredAs = key;
+	};
+	pi.on("session_start", (_event, ctx) => {
+		unregister();
+		register(ctx);
+	});
+	pi.on("session_shutdown", unregister);
+
 	pi.on("message_end", (event) => {
 		const m = event.message as { role?: string; content?: unknown };
 		if (m.role !== "assistant" || !Array.isArray(m.content)) return;
@@ -78,6 +130,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
+		if (event.toolName === "subagent") register(ctx); // the session key can change after the run started
 		if (gated && !flowSeen && attempts <= MAX_FLOW_BLOCKS) {
 			return {
 				block: true,
@@ -96,7 +149,8 @@ export default function (pi: ExtensionAPI) {
 		const line = command.slice(start, end < 0 ? undefined : end).trim();
 		const reason =
 			"armarium-pi: this command is destructive or touches credentials, so it needs the user's yes. " +
-			"Stop and ask the user in your reply (a subagent asks its supervisor with contact_supervisor).";
+			"Stop and ask the user in your reply. A subagent has no user here, and a supervisor's yes does not open this check: " +
+			"report the command as blocked in your final answer.";
 		if (!ctx.hasUI) return { block: true, reason };
 		// The match goes first so padding cannot push the risky part out of the dialog.
 		const shown = command.length > 800 ? `${command.slice(0, 800)}\n… (${command.length} chars)` : command;

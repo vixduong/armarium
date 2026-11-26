@@ -59,7 +59,7 @@ def norm(p):
 
 
 def world():
-    base = tempfile.mkdtemp()
+    base = os.path.realpath(tempfile.mkdtemp())  # macOS: /var links to /private/var and git reports the resolved path
     home = os.path.join(base, "home")
     os.makedirs(os.path.join(home, ".claude", "projects"))
     return base, home, mkrepo(base)
@@ -157,7 +157,7 @@ if NT:
     check("cwd git.exe: not run, PATH git links", rc == 0 and is_link(proj_mem(home, repo)), rc)
 
 # the ~/.claude repo itself: <root>/memory
-base = tempfile.mkdtemp()
+base = os.path.realpath(tempfile.mkdtemp())
 home = os.path.join(base, "home")
 ch = os.path.join(home, ".claude")
 os.makedirs(ch)

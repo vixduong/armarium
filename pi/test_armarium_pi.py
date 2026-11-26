@@ -12,18 +12,36 @@ if not shutil.which("node"):
 #   {"ev": "start", "type": "user"|"custom", "argv": [...], "opts": {...}} -> contextFiles after before_agent_start
 #   {"ev": "msg", "text": "...", "thinking": "...", "calls": n}            -> null (assistant message_end with n tool calls)
 #   {"ev": "tool", "tool": "bash", "input": {...}, "ui": bool, "yes": bool} -> tool_call result
+#   {"ev": "session_start", "file": str|null, "id": str} / {"ev": "session_shutdown"} -> pi-subagents required-extension registry
+#   {"ev": "preset", "key": str, "entries": [...]}                    -> registry (another host registered first)
 DRIVER = """
 const ext = (await import(process.argv[1])).default;
 const handlers = {};
 ext({ on: (name, fn) => { handlers[name] = fn; } });
 const out = [];
+const REG = Symbol.for("pi-subagents.required-child-extensions.v1");
+const reg = () => Object.fromEntries(globalThis[REG]?.bySession ?? []);
+const presets = {};
+let session = { getSessionFile: () => undefined, getSessionId: () => "none" };
 for (const s of JSON.parse(process.argv[2])) {
-  if (s.ev === "start") {
+  if (s.ev === "preset") {
+    globalThis[REG] ??= { version: 1, bySession: new Map() };
+    presets[s.key] = Object.freeze(s.entries);
+    globalThis[REG].bySession.set(s.key, presets[s.key]);
+    out.push(reg());
+  } else if (s.ev === "same") {
+    out.push(globalThis[REG]?.bySession.get(s.key) === presets[s.key]);
+  } else if (s.ev === "session_start" || s.ev === "session_shutdown") {
+    if (s.ev === "session_start") session = { getSessionFile: () => s.file ?? undefined, getSessionId: () => s.id };
+    await handlers[s.ev]({ type: s.ev, reason: "startup" }, { sessionManager: session });
+    out.push(reg());
+  } else if (s.ev === "start") {
     const argv = process.argv;
     process.argv = [...argv, ...(s.argv ?? [])];
     const event = { messageType: s.type ?? "user", systemPrompt: "", systemPromptOptions: { appendSystemPrompt: "", ...s.opts,
       contextFiles: [{ path: "/proj/AGENTS.md", content: "project rules" }] } };
-    await handlers.before_agent_start(event, {});
+    await handlers.before_agent_start(event, { sessionManager: session });
+    if (s.reg) { out.push(reg()); process.argv = argv; continue; }
     process.argv = argv;
     out.push(event.systemPromptOptions.contextFiles);
   } else if (s.ev === "msg") {
@@ -36,6 +54,7 @@ for (const s of JSON.parse(process.argv[2])) {
   } else {
     const asked = [];
     const ctx = { hasUI: !!s.ui, signal: undefined, ui: { confirm: async (t, m, o) => { asked.push({ m, timeout: o?.timeout }); return !!s.yes; } } };
+    ctx.sessionManager = session;
     const r = await handlers.tool_call({ type: "tool_call", toolName: s.tool, toolCallId: "t", input: s.input }, ctx);
     out.push({ result: r ?? null, asked });
   }
@@ -155,6 +174,30 @@ check("ctx_execute with a risky command is checked", blocked(r[3]), r[3])
 for name in ["subagent, appended prompt", "-nc"]:
     r = run([{"ev": "start", **SKIPS[name]}, bash("git push --force")])
     check(name + ": risky still blocked", blocked(r[1]), r[1])
+
+# --- every pi-subagents child of this session must load this extension ---
+# requireForAllRunners: pi-subagents then refuses machine and external-CLI launches and keeps the snapshot with the run.
+SELF = [{"id": "armarium-pi", "path": os.path.realpath(EXT), "requireForAllRunners": True}]
+A = {"ev": "session_start", "file": "/s/a.jsonl", "id": "a"}  # pi-subagents keys the registry by session id, never the file
+RUN = {"ev": "start", "reg": True}
+r = run([A])
+check("session start registers under the session id (a /run before any prompt is gated)", r[0] == {"a": SELF}, r[0])
+r = run([A, RUN])
+check("a run keeps the one registration", r[1] == {"a": SELF}, r[1])
+r = run([A, {"ev": "session_start", "file": "/s/b.jsonl", "id": "b"}])
+check("a new session moves the registration", r[1] == {"b": SELF}, r[1])
+r = run([A, {"ev": "session_shutdown"}])
+check("shutdown removes the registration", r[1] == {}, r[1])
+r = run([{"ev": "start", **SKIPS["subagent, appended prompt"], "reg": True}])
+check("a subagent child registers too, so its own children load the gate", r[0] == {"none": SELF}, r[0])
+r = run([A, {"ev": "session_shutdown"}, {"ev": "tool", "tool": "subagent", "input": {}}, {"ev": "same", "key": "x"}])
+check("a subagent call registers again when the key is missing", r[2] and r[2]["result"] is None, r[2])
+r2 = run([A, {"ev": "session_shutdown"}, {"ev": "tool", "tool": "subagent", "input": {}}, {"ev": "preset", "key": "zz", "entries": []}])
+check("and the registry then holds it", r2[3].get("a") == SELF, r2[3])
+OTHER = [{"id": "other", "path": "/x/other.ts"}]
+r = run([{"ev": "preset", "key": "a", "entries": OTHER}, A, {"ev": "session_shutdown"}, {"ev": "same", "key": "a"}])
+check("a host that registered first keeps its entry beside ours", r[1] == {"a": OTHER + SELF}, r[1])
+check("shutdown restores the other host's exact array, so its dispose() still matches", r[3] is True, r[2:])
 
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)
