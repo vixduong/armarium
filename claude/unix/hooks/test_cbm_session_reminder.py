@@ -73,4 +73,11 @@ h = setup(); stub(h, GRAPH)
 env = {"HOME": h, "PATH": os.environ["PATH"]}
 p = subprocess.run([HOOK], input="{}", capture_output=True, text=True, env=env)
 check("no cwd passes through", p.returncode == 0 and p.stdout.strip() == GRAPH, p.stdout)
+
+# a cache dir that cannot be made: the graph still prints, and no shell error reaches the session
+h = setup(); stub(h, GRAPH)
+open(os.path.join(h, ".cache", "codebase-memory-mcp", "hook-cache"), "w").close()  # a file where the dir should be: mkdir -p fails
+p = subprocess.run([HOOK], input=json.dumps({"cwd": "/repo/x"}), capture_output=True, text=True, env={"HOME": h, "PATH": os.environ["PATH"]})
+check("unwritable cache: graph still printed", p.returncode == 0 and p.stdout.strip() == GRAPH, p.stdout)
+check("unwritable cache: stderr stays empty", p.stderr == "", p.stderr)
 sys.exit(1 if fails else 0)

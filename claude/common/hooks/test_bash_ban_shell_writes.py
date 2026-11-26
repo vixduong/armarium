@@ -74,6 +74,14 @@ RO_ALLOW = [
     ("worker", "git show main:a.java > .scratch/a.java"),
 ]
 
+# Rewrites that must not change the hook's verdict: a blocked command stays blocked, an allowed one stays allowed.
+# A change to the hook's patterns that opens one shows up here.
+def variants(c):
+    out = ["cd /tmp && " + c, "true; " + c, 'cat <<< "x"\n' + c]
+    if " > " in c:
+        out += [c.replace(" > ", " 1> ", 1), c.replace(" > ", " >| ", 1), c.replace(" > ", " >", 1)]
+    return out
+
 def run(cmd, agent=None):
     data = {"tool_name": "Bash", "tool_input": {"command": cmd}}
     if agent: data["agent_type"] = agent
@@ -85,11 +93,16 @@ for c in BLOCK:
     if run(c) != 2: fails += 1; print("SHOULD BLOCK:", repr(c))
 for c in ALLOW:
     if run(c) != 0: fails += 1; print("SHOULD ALLOW:", repr(c))
+VARIANTS = [v for c in BLOCK for v in variants(c)]
+for v in VARIANTS:
+    if run(v) != 2: fails += 1; print("SHOULD BLOCK (variant):", repr(v))
+for c in ALLOW:
+    if run("cd /tmp && " + c) != 0: fails += 1; print("SHOULD ALLOW (variant):", repr("cd /tmp && " + c))
 for a, c in RO_BLOCK:
     if run(c, a) != 2: fails += 1; print("SHOULD BLOCK for", a, repr(c))
 for a, c in RO_ALLOW:
     if run(c, a) != 0: fails += 1; print("SHOULD ALLOW for", a, repr(c))
 nb = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_name": "Read", "tool_input": {}}), capture_output=True, text=True).returncode
 if nb != 0: fails += 1; print("non-Bash tool should pass")
-print("FAILS", fails, "of", len(BLOCK) + len(ALLOW) + len(RO_BLOCK) + len(RO_ALLOW) + 1)
+print("FAILS", fails, "of", len(BLOCK) + 2 * len(ALLOW) + len(VARIANTS) + len(RO_BLOCK) + len(RO_ALLOW) + 1)
 sys.exit(1 if fails else 0)

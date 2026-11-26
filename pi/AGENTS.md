@@ -37,7 +37,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 
 ## Code flow (MANDATORY, IN ORDER; skipped a step → restart from it)
 **Big** = >3 files, or >200 changed lines, or touches auth/permission, money, migration, public API, concurrency.
-**Small** = ≤2 files and ≤80 changed lines, not Big, no untrusted input or auth/secrets → steps 1–3, 6, 7 (one track); skip 4, 5, 8.
+**Small** = ≤2 files and ≤80 changed lines, not Big, no untrusted input or auth/secrets → steps 1–3, 6, 7 (one track); skip 4, 5, 8. Neither Big nor Small → Small's steps plus step 8.
 **Untrusted input** = data another party can set (request, CLI arg, env, uploaded or repo file, browser storage or URL, queue message, DB rows users wrote, LLM output) that the diff parses or passes to a sink: SQL, shell, file path, HTML or template (`innerHTML`, `v-html`, `dangerouslySetInnerHTML`), `eval`, deserializer (`pickle`, `yaml.load`), redirect URL, or a loop or allocation sized by it. Repo config counts only when it reaches a sink.
 
 1. **Intake**: spec, ticket, or approved plan given → it is the contract: its acceptance criteria are the check; skip 2, 4 and track choice. The Route row's lead skill and step 6 still run before the first line of code. Code that must differ from the contract → record the deviation in code and the final reply; edit the contract only after the user agrees, also when the contract itself is wrong.
@@ -54,7 +54,7 @@ DRY/KISS/YAGNI/SSOT. Ask before destructive.
 6. **TDD**: each behavior's failing test is seen red before its code, fix rounds included; the `tdd` skill is required only when step 1's track names it. Happy + fail + the edge cases that apply (empty/null/boundary/concurrency/tz/unicode/overflow/permission/network/partial). Pure presentation is checked by eye per the frontend gate. The test lives in the repo's test tree and goes into the same commit as the code; a script in `/tmp` is not a test.
 7. **Verify**: the gate command passes; re-run the step 3 search: every site updated; UI change → screenshots per the frontend gate; rendered video → frames per the video gate. Fail → fix root cause.
 8. **Review**: after 7 is green; each range reviewed once (a review `/skill:implement` already ran counts; its closing `code-review` covers only commits no earlier review covered).
-   - Diff Big → `reviewer` ← changed files + acceptance criteria (a plan or acceptance file another agent wrote counts as criteria). A spec or ticket a person wrote → `code-review` instead. Last open ticket of a spec → `code-review` on the whole spec range.
+   - Diff not Small → `reviewer` ← changed files + acceptance criteria (a plan or acceptance file another agent wrote counts as criteria). A spec or ticket a person wrote → `code-review` instead. Last open ticket of a spec → `code-review` on the whole spec range.
    - Untrusted input or auth/secrets → also a security review, whatever the size: a separate `reviewer` call with a security-only task on the same diff (`security-audit` skill as its guide), never folded into the general review.
    - Animation in the diff → also `review-animations`: UI per frontend gate step 6, rendered video per video gate step 5.
    - Model: every `reviewer` call runs at least on the tier that wrote the code, capped at opus, and on opus when hard to undo (auth/permission, secrets, money, migration), whatever the size: pass `model` to `subagent`; otherwise the tier pi settings `subagents.agentOverrides` pin. A review that still missed a bug → one tier up.

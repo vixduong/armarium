@@ -39,6 +39,7 @@ pi/                          the same rule set for the pi coding agent, as a pi 
 ├── package.json             the package manifest
 └── settings.example.json    opt-in: packages, skills, models, subagent tiers
 bin/check                    repo gate: self-tests and config checks; .githooks/pre-commit runs it
+.github/workflows/check.yml  runs `bin/check --repo-only` on Linux, macOS and Windows
 docs/
 └── rule-origins.md          the incident and evidence behind each rule
 ```

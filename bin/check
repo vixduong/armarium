@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Gate for this repo: bin/check [repo]. Runs every self-test and the static checks below; exit 1 on any problem.
+"""Gate for this repo: bin/check [--repo-only] [repo]. Runs every self-test and the static checks below; exit 1 on any problem.
+--repo-only (CI): skips what only the owner's machine can answer, the Names check and ~/.claude pointers the repo does not ship.
 Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows/ each overlay it onto ~/.claude.
 - JSON: every settings.example.json (claude/unix, claude/windows, pi) parses.
 - Settings: every ~/.claude/... path a setting calls exists in its OS dir or common/; unix hooks are executable.
@@ -9,12 +10,16 @@ Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows
 - Exec: a claude/windows/ hook or a Python hook in claude/common/hooks/ never starts a bare program name (Windows searches
   the cwd, the user's project, first).
   Reads list/tuple argv, also as the left side of +; os.system, shell=True strings and argv held in a variable are not read.
+- Docs: every hook a settings.example.json calls is named in that OS's README (README.md, claude/windows/README.md).
+- Drops: ALLOWED_DROPS in hooks/agent-no-downgrade equals the "<tier> /" entries of agent-tuning.md's "Drop when" column.
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
   unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
 Self-test: python3 -I bin/test_check.py"""
 import ast, glob, json, ntpath, os, re, subprocess, sys
 
-REPO = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), ".."))
+REPO_ONLY = "--repo-only" in sys.argv
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+REPO = os.path.abspath(ARGS[0] if ARGS else os.path.join(os.path.dirname(__file__), ".."))
 CLAUDE = os.path.join(REPO, "claude", "common")
 UNIX = os.path.join(REPO, "claude", "unix")
 WINDOWS = os.path.join(REPO, "claude", "windows")
@@ -91,7 +96,7 @@ for md in [p for d in (CLAUDE, UNIX) for p in glob.glob(os.path.join(d, "**", "*
     with open(md, encoding="utf-8") as fh:
         text = fh.read()
     for path in set(re.findall(r"~/\.claude/([\w./-]+\.\w+)", text)):
-        if not any(os.path.exists(os.path.join(d, path)) for d in (CLAUDE, UNIX, HOME_DOT)):
+        if not REPO_ONLY and not any(os.path.exists(os.path.join(d, path)) for d in (CLAUDE, UNIX, HOME_DOT)):
             problems.append("%s points to ~/.claude/%s, which does not exist" % (rel(md), path))
     for name in set(re.findall(r"`([\w.-]+\.md)`", text)):
         if name not in names_in_repo and name not in PROJECT_FILES:
@@ -162,7 +167,7 @@ for md in [os.path.join(CLAUDE, "CLAUDE.md")] + glob.glob(os.path.join(CLAUDE, "
             prefix = name.rpartition(":")[0] or name
             if prefix in DECLARED and prefix not in PLUGINS:
                 continue
-            if (name in lead or is_plugin(name.rpartition(":")[0])) and name not in BUILTIN and not is_agent(name):
+            if not REPO_ONLY and (name in lead or is_plugin(name.rpartition(":")[0])) and name not in BUILTIN and not is_agent(name):
                 problems.append("%s names `%s`, which no installed skill or agent matches" % (rel(md), name))
             continue
         if name in unlocked:
@@ -173,6 +178,39 @@ for md in [os.path.join(CLAUDE, "CLAUDE.md")] + glob.glob(os.path.join(CLAUDE, "
                 full = name if ":" in name or not owner(skill) else "%s:%s" % (owner(skill), name)
                 problems.append("%s tells the model to call `%s`, which is user-only: write `/%s`, or unlock it with skill-model-invocable"
                                 % (rel(md), name, full))
+
+# Docs: a hook the settings call but the README never names is a hook nobody was told about (skipped where the README is absent)
+for f, readme in ((UNIX_SETTINGS, "README.md"), (WINDOWS_SETTINGS, "claude/windows/README.md")):
+    if f not in settings or not os.path.exists(os.path.join(REPO, readme)):
+        continue
+    with open(os.path.join(REPO, readme), encoding="utf-8") as fh:
+        text = fh.read()
+    for name in sorted({m for s in strings(settings[f]) for m in re.findall(r"/\.claude/hooks/([\w.-]+)", s)}):
+        if name not in text:
+            problems.append("%s calls hooks/%s, which %s does not name" % (f, name, readme))
+
+# Drops: the hook and the table it enforces say the same (skipped where either is absent)
+drops_hook, tuning = os.path.join(CLAUDE, "hooks", "agent-no-downgrade"), os.path.join(CLAUDE, "agent-tuning.md")
+if os.path.exists(drops_hook) and os.path.exists(tuning):
+    with open(drops_hook, encoding="utf-8") as fh:
+        try:
+            allowed = next((ast.literal_eval(n.value) for n in ast.walk(ast.parse(fh.read())) if isinstance(n, ast.Assign)
+                            and getattr(n.targets[0], "id", "") == "ALLOWED_DROPS"), None)
+        except ValueError:  # not a literal: this check cannot read it
+            allowed = None
+            problems.append("%s: ALLOWED_DROPS must be a literal dict of sets, so bin/check can compare it with agent-tuning.md" % rel(drops_hook))
+    listed = {}
+    with open(tuning, encoding="utf-8") as fh:
+        for line in fh:
+            cells = [c.strip() for c in line.split("|")]
+            tiers = set(re.findall(r"\b(haiku|sonnet|opus|fable) /", cells[5])) if len(cells) >= 7 else set()
+            if tiers and re.match(r"`[\w-]+`$", cells[1]):
+                listed[cells[1].strip("`")] = tiers
+    if allowed is not None and allowed != listed:
+        for agent in sorted(set(allowed) | set(listed)):
+            if allowed.get(agent, set()) != listed.get(agent, set()):
+                problems.append("agent-no-downgrade lets `%s` drop to %s, but agent-tuning.md \"Drop when\" lists %s" % (
+                    agent, sorted(allowed.get(agent, set())) or "nothing", sorted(listed.get(agent, set())) or "nothing"))
 
 # Exec: argv[0] of a subprocess call in a hook Windows runs is a full path or a value (resolve(), which(), sys.executable), never a literal name
 for py in glob.glob(os.path.join(WINDOWS, "**", "*.py"), recursive=True) + glob.glob(os.path.join(CLAUDE, "hooks", "*")):

@@ -44,11 +44,11 @@ def fixture(files=None, settings=SETTINGS, skills=None, home_files=None):
     return repo, home
 
 
-def run(repo, home):
+def run(repo, home, args=()):
     env = {"HOME": home, "PATH": os.environ["PATH"]}
     if sys.platform == "win32":  # expanduser reads USERPROFILE there, so HOME alone left the real ~/.claude in play
         env.update(USERPROFILE=home, SystemRoot=os.environ["SystemRoot"])
-    p = subprocess.run([sys.executable, CHECK, repo], capture_output=True, text=True, env=env)
+    p = subprocess.run([sys.executable, CHECK, repo, *args], capture_output=True, text=True, env=env)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -58,11 +58,11 @@ fails = total = 0
 
 def case(label, want_rc, want_text, **kw):
     global fails, total
-    pre = kw.pop("pre", None)
+    pre, args = kw.pop("pre", None), kw.pop("args", ())
     repo, home = fixture(**kw)
     if pre:
         pre(repo)
-    rc, out = run(repo, home)
+    rc, out = run(repo, home, args)
     ok = rc == want_rc and (want_text in out)
     total += 1
     fails += not ok
@@ -167,6 +167,34 @@ case("bare program name in a shared Python hook", 1, "runs bare 'git'",
 case("shared Python hook that resolves the program passes", 0, "check: ok",
      files={"claude/common/hooks/py-hook": '#!/usr/bin/env python3\nimport subprocess\nfrom path_only import which\n'
             'subprocess.run([which("git"), "status"])\n'})
+
+# CI has the repo but not the owner's skills, plugins or settings: --repo-only skips what only that machine can answer
+case("--repo-only skips a lead skill that is not installed", 0, "check: ok", args=["--repo-only"],
+     files={"claude/common/CLAUDE.md": ROUTE + "| Video | Code flow | `ghost` | done |\n"})
+case("--repo-only skips a ~/.claude pointer the repo does not ship", 0, "check: ok", args=["--repo-only"],
+     files={"claude/common/CODING_STANDARDS.md": "See `~/.claude/enforcement.md`.\n"})
+case("--repo-only still fails a dead bare .md pointer", 1, "enforcement.md", args=["--repo-only"],
+     files={"claude/common/CODING_STANDARDS.md": "See `enforcement.md` (AC-09).\n"})
+
+# every hook a settings file calls is described in that OS's README
+case("unix settings call a hook README.md does not name", 1, "README.md does not name",
+     files={"README.md": "Hooks: `skill-model-invocable`.\n"})
+case("README.md names every hook the unix settings call", 0, "check: ok",
+     files={"README.md": "Hooks: `good-hook`, `skill-model-invocable`.\n"})
+WIN_HOOK = json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python C:/Users/YOU/.claude/hooks/good-hook"}]}]}})
+case("windows settings call a hook the Windows README does not name", 1, "claude/windows/README.md does not name",
+     files={"claude/windows/settings.example.json": WIN_HOOK, "claude/windows/README.md": "Ports.\n"})
+
+# agent-no-downgrade's ALLOWED_DROPS and agent-tuning.md's "Drop when" column say the same
+DROPS_HOOK = '#!/usr/bin/env python3\nALLOWED_DROPS = {"worker": {"haiku"}, "oracle": {"opus", "sonnet"}}\n'
+TUNING = ("| Agent | Default | Why | Raise when | Drop when |\n|---|---|---|---|---|\n"
+          "| `explorer` | haiku / medium | recon | sonnet: wide | low: files named |\n"
+          "| `worker` | sonnet / medium | writes | — | haiku / medium: mechanical edits |\n"
+          "| `oracle` | fable / medium | judgment | — | %s when the Fable limit is exhausted |\n")
+case("ALLOWED_DROPS lists a drop agent-tuning.md does not", 1, "oracle",
+     files={"claude/common/hooks/agent-no-downgrade": DROPS_HOOK, "claude/common/agent-tuning.md": TUNING % "sonnet / high"})
+case("ALLOWED_DROPS matches the Drop when column", 0, "check: ok",
+     files={"claude/common/hooks/agent-no-downgrade": DROPS_HOOK, "claude/common/agent-tuning.md": TUNING % "opus / high, else sonnet / high,"})
 
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

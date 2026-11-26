@@ -1,0 +1,33 @@
+# Runs the repo gate on the three OSes the config supports. The Windows job is the only run of the ports on Windows itself,
+# and of install.ps1.
+name: check
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24" # pi/test_armarium_pi.py imports a .ts file: node >= 22.18
+      # Some self-tests read the installed copy (agent-no-downgrade reads ~/.claude/agents), so install the repo first.
+      - name: Install into ~/.claude (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: mkdir -p ~/.claude && cp -R claude/common/. claude/unix/. ~/.claude/
+      - name: Install into ~/.claude (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./claude/windows/install.ps1 -Apply
+      # --repo-only: the runner has none of the owner's skills, plugins or settings.
+      - run: python bin/check --repo-only
