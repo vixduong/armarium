@@ -11,6 +11,7 @@ if not shutil.which("node"):
 # argv[2] = JSON list of steps, run in order against one extension instance; prints one result per step.
 #   {"ev": "start", "type": "user"|"custom", "argv": [...], "opts": {...}} -> contextFiles after before_agent_start
 #   {"ev": "msg", "text": "...", "thinking": "...", "calls": n}            -> null (assistant message_end with n tool calls)
+#   {"ev": "settle", "outcome": "completed"|"aborted"|"error", "entries": [...]} -> agent_before_settle result
 #   {"ev": "tool", "tool": "bash", "input": {...}, "ui": bool, "yes": bool} -> tool_call result
 #   {"ev": "session_start", "file": str|null, "id": str} / {"ev": "session_shutdown"} -> pi-subagents required-extension registry
 #   {"ev": "preset", "key": str, "entries": [...]}                    -> registry (another host registered first)
@@ -44,6 +45,10 @@ for (const s of JSON.parse(process.argv[2])) {
     if (s.reg) { out.push(reg()); process.argv = argv; continue; }
     process.argv = argv;
     out.push(event.systemPromptOptions.contextFiles);
+  } else if (s.ev === "settle") {
+    const r = await handlers.agent_before_settle?.({ type: "agent_before_settle", entries: s.entries ?? [], continue: false,
+      outcome: s.outcome ?? "completed", context: {} }, { sessionManager: session });
+    out.push(r ?? null);
   } else if (s.ev === "msg") {
     const content = [];
     if (s.thinking) content.push({ type: "thinking", thinking: s.thinking });
@@ -71,9 +76,10 @@ def check(label, ok, detail=""):
     fails += not ok
     print(("ok   " if ok else "FAIL ") + label, "" if ok else detail)
 
-def run(steps):
-    p = subprocess.run(["node", "--no-warnings", "--input-type=module", "-e", DRIVER, pathlib.Path(EXT).as_uri(), json.dumps(steps)],
-                       capture_output=True, encoding="utf-8", cwd=HERE)
+def run(steps, path=None):
+    """path: the PATH the extension sees (node itself is started by full path)."""
+    p = subprocess.run([shutil.which("node"), "--no-warnings", "--input-type=module", "-e", DRIVER, pathlib.Path(EXT).as_uri(), json.dumps(steps)],
+                       capture_output=True, encoding="utf-8", cwd=HERE, env=None if path is None else dict(os.environ, PATH=path))
     if p.returncode:
         check("driver runs", False, p.stderr[-1500:])
         return [None] * len(steps)
@@ -179,9 +185,49 @@ r = run([START, FLOW, bash("git reset --hard", parent="call_1"), bash("git statu
 check("a risky bash call nested in a codemode script is blocked", blocked(r[2]) and "ask" in reason(r[2]).lower(), r[2])
 check("a benign nested call runs", not blocked(r[3]), r[3])
 check("a nested call before the Flow line is blocked", blocked(r[5]) and "Flow:" in reason(r[5]), r[5])
+# --- shell writes: a bash command goes through claude/common/hooks/bash-ban-shell-writes, the hook Claude Code runs ---
+r = run([START, FLOW, bash("echo x > f.txt", ui=True, yes=True), bash("make check > log 2>&1"), bash("sed -i 's/a/b/' f", parent="call_1"),
+         {"ev": "tool", "tool": "ctx_execute", "input": {"language": "python", "code": "print(1 > 0)\nprint('a' > 'b')"}}])
+check("bash: echo into a file is blocked", blocked(r[2]) and "writes a file" in reason(r[2]), r[2])
+check("bash: a blocked write does not ask the user", not (r[2] or {}).get("asked"), r[2])
+check("bash: a log redirect runs", not blocked(r[3]), r[3])
+check("bash nested in a codemode script: sed -i is blocked", blocked(r[4]) and "sed -i" in reason(r[4]), r[4])
+check("ctx_execute code is not read as shell", not blocked(r[5]), r[5])
+r = run([START, FLOW, bash("echo x > f.txt"), bash("rm -rf build")], path=os.path.join(HERE, "no-such-dir"))
+check("no python on PATH: the write check lets the command through", not blocked(r[2]), r[2])
+check("no python on PATH: the risky-command check still blocks", blocked(r[3]), r[3])
 for name in ["subagent, appended prompt", "-nc"]:
     r = run([{"ev": "start", **SKIPS[name]}, bash("git push --force")])
     check(name + ": risky still blocked", blocked(r[1]), r[1])
+
+# --- Exit list: a run with a Flow line that ends on a reply without a ✓ or ✗ line gets one more turn with a reminder ---
+SETTLE = {"ev": "settle"}
+WORK = {"ev": "msg", "text": "Flow: Code flow, Small", "calls": 1}
+def said(t): return {"ev": "msg", "text": t}
+def nudged(x): return bool(x and x.get("continue"))
+r = run([START, WORK, said("done"), SETTLE, said("done again"), SETTLE])
+check("final reply without an Exit list: one more turn", nudged(r[3]), r[3])
+entry = ((r[3] or {}).get("entries") or [{}])[-1]
+check("the reminder is a custom message that asks for the Exit list",
+      entry.get("type") == "custom_message" and "✓" in str(entry.get("content")) and "Exit" in str(entry.get("content")), entry)
+check("one reminder per prompt", r[5] is None, r[5])
+r = run([START, WORK, said("Fixed.\n- ✓ gate green: bin/check\n- ✗ review: Small"), SETTLE])
+check("final reply with an Exit list settles", r[3] is None, r[3])
+r = run([START, WORK, said("- ✗ gate: bin/check failed"), said("so it is not done"), SETTLE])
+check("only the last reply counts", nudged(r[4]), r[4])
+r = run([START, said("4"), SETTLE])
+check("no Flow line (chat answer): settles", r[2] is None, r[2])
+r = run([START, {"ev": "msg", "text": "Flow: answer directly", "calls": 1}, said("It is 4."), SETTLE])
+check("Flow: answer directly needs no Exit list", r[3] is None, r[3])
+r = run([START, WORK, said("done"), {"ev": "settle", "outcome": "aborted"}, {"ev": "settle", "outcome": "error"}])
+check("an aborted or failed run is left alone", r[3] is None and r[4] is None, r[3:])
+KEPT = {"type": "custom", "customType": "other-extension"}
+r = run([START, WORK, said("done"), {"ev": "settle", "entries": [KEPT]}])
+check("entries another extension added are kept", ((r[3] or {}).get("entries") or [None])[0] == KEPT, r[3])
+r = run([{"ev": "start", **SKIPS["subagent, appended prompt"]}, WORK, said("done"), SETTLE])
+check("a subagent run gets no Exit reminder", r[3] is None, r[3])
+r = run([START, WORK, said("done"), SETTLE, START, WORK, said("done"), SETTLE])
+check("a new user prompt is checked again", nudged(r[3]) and nudged(r[7]), [r[3], r[7]])
 
 # --- every pi-subagents child of this session must load this extension ---
 # requireForAllRunners: pi-subagents then refuses machine and external-CLI launches and keeps the snapshot with the run.

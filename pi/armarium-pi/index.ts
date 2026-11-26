@@ -1,8 +1,11 @@
 // armarium-pi: loads armarium's pi rules (AGENTS.md) as a context file, its ~/.pi/agent/ pointers resolved to the repo's
-// shared docs; blocks tool calls until the run's `Flow:` line is written; asks the user before destructive or credential commands.
+// shared docs; blocks tool calls until the run's `Flow:` line is written; asks the user before destructive or credential commands;
+// blocks a bash command that writes a file, as judged by the hook Claude Code runs (claude/common/hooks/bash-ban-shell-writes);
+// gives a run one more turn when its final reply has no Exit list.
 // Self-test: python3 -I pi/test_armarium_pi.py
-import { readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -43,6 +46,22 @@ const RISKY: RegExp[] = [
 // context-mode's tools run shell code outside bash, so their command fields are checked too.
 const SHELL_TOOLS = new Set(["bash", "ctx_execute", "ctx_execute_file", "ctx_batch"]);
 
+// Shell writes: the same hook file Claude Code runs judges the command, so both agents share one rule set and one self-test.
+const WRITES_HOOK = join(shared, "hooks", "bash-ban-shell-writes");
+// Absolute PATH entries only: on Windows a bare program name starts from the cwd, the user's project, first.
+const onPath = (names: string[]): string | undefined => {
+	for (const dir of (process.env.PATH ?? "").split(delimiter).map((d) => d.replace(/^"|"$/g, "")))
+		for (const name of names) if (isAbsolute(dir) && existsSync(join(dir, name))) return join(dir, name);
+};
+// The hook's reason when it blocks (exit 2). No python, a timeout or any other exit lets the command through, as the hook itself fails open.
+const shellWrite = (command: string): string | undefined => {
+	const python = onPath(process.platform === "win32" ? ["python.exe", "python3.exe"] : ["python3", "python"]);
+	if (!python) return;
+	const input = JSON.stringify({ tool_name: "Bash", tool_input: { command } });
+	const r = spawnSync(python, [WRITES_HOOK], { input, encoding: "utf8", timeout: 5000 });
+	return r.status === 2 ? r.stderr.trim().replace(/^BLOCKED:\s*/, "") : undefined;
+};
+
 // pi-subagents' required-child-extension registry (src/shared/required-child-extensions.js): every child of a registered
 // session loads these files whatever its agent settings say, and a load failure aborts the launch instead of running ungated.
 // shortcut: written straight into the versioned global registry so this package needs no pi-subagents dependency;
@@ -71,13 +90,16 @@ export default function (pi: ExtensionAPI) {
 	let gated = false;
 	let flowSeen = false;
 	let attempts = 0; // assistant messages that called tools with no Flow line yet
+	let needsExit = false; // a Flow line other than `answer directly` was written
+	let exitAsked = false;
+	let lastText = ""; // text of the latest assistant message: the final reply when the run settles
 
 	// contextFiles is rebuilt for each run, so read on each run: an edit to AGENTS.md is live without /reload.
 	pi.on("before_agent_start", (event, ctx) => {
 		register(ctx);
 		const o = event.systemPromptOptions;
 		if (event.messageType === "user") {
-			flowSeen = false;
+			flowSeen = needsExit = exitAsked = false;
 			attempts = 0;
 		}
 		// Same reach as a global ~/.pi/agent/AGENTS.md: off under --no-context-files, and pi-subagents children
@@ -125,8 +147,23 @@ export default function (pi: ExtensionAPI) {
 		const m = event.message as { role?: string; content?: unknown };
 		if (m.role !== "assistant" || !Array.isArray(m.content)) return;
 		const parts = m.content as { type?: string; text?: string }[];
-		if (FLOW_LINE.test(parts.map((c) => (c.type === "text" ? c.text : "")).join("\n"))) flowSeen = true;
+		lastText = parts.map((c) => (c.type === "text" ? c.text : "")).join("\n");
+		const flows = lastText.split("\n").filter((l) => FLOW_LINE.test(l));
+		if (flows.length) flowSeen = true;
 		else if (!flowSeen && parts.some((c) => c.type === "toolCall")) attempts++;
+		if (flows.some((l) => !/answer directly/i.test(l))) needsExit = true;
+	});
+
+	// AGENTS.md Exit: every final reply except a chat answer lists the row's Done-when items, each ✓ or ✗.
+	// One reminder per user prompt, so a model that cannot comply still settles (Claude Code: flow-skill-check, stop_hook_active).
+	pi.on("agent_before_settle", (event) => {
+		if (!gated || !needsExit || exitAsked || event.outcome !== "completed") return;
+		if (lastText.split("\n").some((l) => /[✓✗]/.test(l) && !FLOW_LINE.test(l))) return;
+		exitAsked = true;
+		const content =
+			"armarium-pi: this run has a `Flow:` line, but the final reply has no Exit list. Reply again and list the row's " +
+			"Done-when items, each ✓ with its evidence or ✗ with the reason (AGENTS.md Exit).";
+		return { entries: [...event.entries, { type: "custom_message", customType: "armarium-exit", content, display: true }], continue: true };
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
@@ -141,6 +178,9 @@ export default function (pi: ExtensionAPI) {
 		}
 		if (!SHELL_TOOLS.has(event.toolName)) return;
 		const input = event.input as { command?: unknown; commands?: unknown; code?: unknown };
+		// bash only: ctx_execute code may be Python or JS, where > is a comparison.
+		const write = event.toolName === "bash" && typeof input.command === "string" ? shellWrite(input.command) : undefined;
+		if (write) return { block: true, reason: `armarium-pi: ${write} In pi those tools are \`write\` and \`edit\`.` };
 		const command = strings([input.command, input.commands, input.code]).join("\n");
 		const hit = RISKY.map((p) => command.match(p)).find(Boolean);
 		if (!hit) return;
