@@ -12,7 +12,10 @@ Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows
   Reads list/tuple argv, also as the left side of +; os.system, shell=True strings and argv held in a variable are not read.
 - Docs: every hook a settings.example.json calls is named in that OS's README (README.md, claude/windows/README.md).
 - Drops: ALLOWED_DROPS in hooks/agent-no-downgrade equals the "<tier> /" entries of agent-tuning.md's "Drop when" column.
-- pi (warning only): ~/.pi/agent/settings.json exists but its packages do not include this repo's pi/.
+- pi (warnings only): ~/.pi/agent/settings.json exists but its packages do not include this repo's pi/, or its
+  subagents.agentOverrides differ from pi/settings.example.json.
+- Twins (warning only): claude/common/CLAUDE.md or pi/AGENTS.md is staged without the other.
+The last line counts the self-tests and those that printed a line starting with "skip".
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
   unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
 Self-test: python3 -I bin/test_check.py"""
@@ -40,8 +43,10 @@ tests = sorted(glob.glob(os.path.join(CLAUDE, "hooks", "test_*.py")) + glob.glob
                + glob.glob(os.path.join(UNIX, "hooks", "test_*.py"))
                + glob.glob(os.path.join(WINDOWS, "hooks", "test_*.py"))
                + glob.glob(os.path.join(REPO, "pi", "test_*.py")))
+skipped = 0  # self-tests that left part of their work out and said so
 for t in tests:
     p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True)
+    skipped += bool(re.search(r"(?mi)^skip", p.stdout))
     if p.returncode:
         problems.append("%s failed:\n%s" % (rel(t), (p.stdout + p.stderr)[-800:]))
 
@@ -242,14 +247,41 @@ pi_pkg, pi_settings = os.path.join(REPO, "pi"), os.path.join(os.path.expanduser(
 if not REPO_ONLY and os.path.isfile(os.path.join(pi_pkg, "package.json")) and os.path.isfile(pi_settings):
     try:
         with open(pi_settings, encoding="utf-8") as fh:
-            packages = json.load(fh).get("packages", [])
+            pi_live = json.load(fh)
     except (OSError, ValueError):
-        packages = []
+        pi_live = {}
+    packages = pi_live.get("packages", []) if isinstance(pi_live, dict) else []
     sources = [p.get("source", "") if isinstance(p, dict) else str(p) for p in packages]
     if not any(os.path.realpath(os.path.expanduser(s)) == os.path.realpath(pi_pkg) for s in sources):
         print("WARN pi on this machine does not load %s, so no pi run has armarium-pi's gates: run `pi install %s`" % (rel(pi_pkg), pi_pkg))
+    def overrides(data):
+        sub = data.get("subagents") if isinstance(data, dict) else None
+        return sub.get("agentOverrides") if isinstance(sub, dict) else None
+    example, live = overrides(settings.get("pi/settings.example.json")), overrides(pi_live)
+    if isinstance(example, dict) and isinstance(live, dict):
+        home = os.path.expanduser("~").replace("\\", "/")
+
+        def tier(v):  # the example writes this machine's home as /Users/YOU; a Windows path compares with forward slashes
+            return json.dumps(v, sort_keys=True).replace("\\\\", "/").replace(home, "/Users/YOU")
+        for name in sorted(set(example) | set(live)):
+            if tier(example.get(name)) != tier(live.get(name)):
+                print("WARN pi tier of %s differs: pi/settings.example.json has %s, %s has %s" % (
+                    name, tier(example.get(name)), pi_settings, tier(live.get(name))))
+
+# Twins: claude/common/CLAUDE.md and pi/AGENTS.md carry the same rules (CLAUDE.md of this repo). Under pre-commit, a commit
+# that stages one alone gets a warning; a one-sided edit can be right, so it is not a problem.
+twins = ("claude/common/CLAUDE.md", "pi/AGENTS.md")
+if not REPO_ONLY and all(os.path.exists(os.path.join(REPO, t)) for t in twins):
+    try:
+        staged = subprocess.run(["git", "-C", REPO, "diff", "--cached", "--name-only"], capture_output=True, text=True, timeout=10).stdout.split("\n")
+    except (OSError, subprocess.SubprocessError):
+        staged = []
+    for one, other in (twins, twins[::-1]):
+        if one in staged and other not in staged:
+            print("WARN %s is staged without %s: a rule change in one goes into the other in the same commit" % (one, other))
 
 for p in problems:
     print("FAIL " + p)
-print("check: ok (%d self-tests)" % len(tests) if not problems else "check: %d problem(s)" % len(problems))
+print("check: ok (%d self-tests%s)" % (len(tests), ", %d with a skip" % skipped if skipped else "") if not problems
+      else "check: %d problem(s)" % len(problems))
 sys.exit(1 if problems else 0)

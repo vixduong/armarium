@@ -208,5 +208,38 @@ case("the package listed as {source}: no warning", 0, "check: ok", absent="WARN"
 case("no pi on this machine: no warning", 0, "check: ok", absent="WARN", files=PI_PKG)
 case("--repo-only: no warning", 0, "check: ok", absent="WARN", args=["--repo-only"], files=PI_PKG, home_files=pi_settings([]))
 
+# a self-test that skips part of its work says so on a line starting with "skip": check counts those files
+case("a self-test that skips is counted", 0, "1 self-tests, 1 with a skip",
+     files={"claude/common/hooks/test_partial.py": 'print("skip on Windows")\n'})
+case("no skip: the count line stays as it was", 0, "check: ok (1 self-tests)",
+     files={"claude/common/hooks/test_whole.py": 'print("ok   skip-free")\n'})
+
+# pi: the tiers this machine runs (subagents.agentOverrides) and the ones pi/settings.example.json shows are the same
+def overrides(reviewer): return json.dumps({"packages": ["{HOME}/../repo/pi"], "subagents": {"agentOverrides": {
+    "reviewer": {"model": reviewer}, "researcher": {"subagentOnlyExtensions": ["{HOME}/.pi/x.js"]}}}})
+EXAMPLE = json.dumps({"subagents": {"agentOverrides": {"reviewer": {"model": "opus"}, "researcher": {"subagentOnlyExtensions": ["/Users/YOU/.pi/x.js"]}}}})
+case("pi tiers differ from the example: a warning that names the agent", 0, "WARN pi tier of reviewer",
+     files=dict(PI_PKG, **{"pi/settings.example.json": EXAMPLE}), home_files={".pi/agent/settings.json": overrides("sonnet")})
+case("pi settings with subagents: null do not break the gate", 0, "check: ok", absent="Traceback",
+     files=dict(PI_PKG, **{"pi/settings.example.json": EXAMPLE}),
+     home_files={".pi/agent/settings.json": json.dumps({"packages": ["{HOME}/../repo/pi"], "subagents": None})})
+case("pi tiers match the example, home path aside: no warning", 0, "check: ok", absent="WARN",
+     files=dict(PI_PKG, **{"pi/settings.example.json": EXAMPLE}), home_files={".pi/agent/settings.json": overrides("opus")})
+
+# CLAUDE.md and pi/AGENTS.md carry the same rules: a commit that stages one without the other gets a warning
+def stage(*paths):
+    def pre(repo):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}  # under pre-commit, GIT_INDEX_FILE names the real index
+        subprocess.run(["git", "-C", repo, "init", "-q"], check=True, env=env)
+        subprocess.run(["git", "-C", repo, "add", "--", *paths], check=True, env=env)
+    return pre
+TWIN = {"pi/AGENTS.md": "Rules.\n"}
+case("CLAUDE.md staged without pi/AGENTS.md: a warning", 0, "WARN claude/common/CLAUDE.md is staged without pi/AGENTS.md",
+     files=TWIN, pre=stage("claude/common/CLAUDE.md"))
+case("pi/AGENTS.md staged without CLAUDE.md: a warning", 0, "WARN pi/AGENTS.md is staged without claude/common/CLAUDE.md",
+     files=TWIN, pre=stage("pi/AGENTS.md"))
+case("both staged: no warning", 0, "check: ok", absent="WARN", files=TWIN, pre=stage("claude/common/CLAUDE.md", "pi/AGENTS.md"))
+case("neither staged: no warning", 0, "check: ok", absent="WARN", files=TWIN, pre=stage("claude/common/CODING_STANDARDS.md"))
+
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

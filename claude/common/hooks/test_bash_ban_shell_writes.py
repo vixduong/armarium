@@ -166,5 +166,20 @@ try:
     if run("echo x > f", "reviewer") != 2: fails += 1; print("unlocked: a read-only agent stays blocked")
 finally:
     os.remove(unlock)
-print("FAILS", fails, "of", len(BLOCK) + 2 * len(ALLOW) + len(VARIANTS) + len(RO_BLOCK) + len(RO_ALLOW) + 4)
+# The hook must never fall over: any other exit than 0 or 2 is a hook error, which Claude Code lets through, so a command
+# that crashes the parser would pass the gate. Fixed seed, so a failure names a command that fails every time.
+import random
+rnd = random.Random(20261127)
+PARTS = ["'", '"', "\\", "$(", ")", "(", "`", "<<", "<<<", ">", ">>", "|", "&", ";", "#", "\n", " ", "$'", "{", "}", "EOF", "echo", "cat", "bash", "-c", "f", "x"]
+NASTY = ["$(" * 1000 + "echo x > f", '"$(' * 1000, "`" * 999, "'" * 5001, "\\", "echo x \\", "cat <<EOF\nnever closed", "((((" * 5000, "))))" * 5000,
+         "echo \0 > f", "x" * 50000, "<<" * 5000, "$'\\", "bash -c " * 300 + "'echo x > f'"]
+FUZZ = NASTY + ["".join(rnd.choice(PARTS) for _ in range(rnd.randint(1, 60))) for _ in range(150)]
+for c in FUZZ:
+    try:
+        rc = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": c}}),
+                            capture_output=True, text=True, timeout=10).returncode
+    except subprocess.TimeoutExpired:
+        rc = "timeout"
+    if rc not in (0, 2): fails += 1; print("HOOK ERROR (exit %s) on:" % rc, repr(c[:120]))
+print("FAILS", fails, "of", len(BLOCK) + 2 * len(ALLOW) + len(VARIANTS) + len(RO_BLOCK) + len(RO_ALLOW) + 4 + len(FUZZ))
 sys.exit(1 if fails else 0)
