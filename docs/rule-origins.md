@@ -193,17 +193,18 @@ Sonnet main with opus workers built two feature slices on the same private Djang
 | UI row for UI files (`hooks/flow-skill-check`) | Both slices with a page wrote only "Code flow", so no Done-when asked for loading and long-content states. Second session with missing states (4f71e73c) | report finding 3; screenshots read by workers a7a7aa0e, acb4ae5a, abeed048 | The Stop hook blocks once when files matching `rules/frontend.md` `paths:` were committed since the prompt, or are dirty and touched since, and the Flow line has no `UI` |
 | Advisor cost (`skills/claude-md-audit/scripts/session_audit.py`) | The script reported $34.97; 19 advisor calls sit in `usage.iterations[]` and cost $10.74 more | the audit's reviewer re-derived the total from raw usage | Each `advisor_message` iteration is priced at its own model and counted in its agent's total and the cost mix |
 
+## Changed after the 09dd1875 session audit
+
+A Fable main session worked on this repo for 7 hours: a whole-repo review, 12 code turns and an overnight run on issue #1, for about 70.69 USD. Report: `/Users/Shared/claude-evals/session-09dd1875/report.md`. The findings left open are issues #2 to #7 and #15.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| `autoCompactWindow` 400k for Fable (`~/.claude/settings.json`, `modelSettings`) | A 7-hour session grew to 769k tokens of context with no compaction. Opus and Sonnet already had the 400k window; Fable had none | audit of session `09dd1875`: 125 of 244 main requests ran above 400k and cost 40.16 of 58.68 USD, and one cache rewrite of 672,616 tokens cost 10.76 USD. `session-0fb097b2` had the same finding | Fable gets `autoCompactWindow: 400000` |
+| `claudeMdExcludes` for `claude/common/CLAUDE.md` (`~/.claude/settings.json`) | `~/.claude/CLAUDE.md` is a symlink into this repo, so a session that read a file under `claude/common/` loaded the rules twice (15,293 and 15,294 chars) | audit of session `09dd1875`; a `claude -p` probe after the change loaded the User copy only | The repo copy is excluded by its absolute path |
+
 ## Still open
 
-- From the 7f560b1a audit, one session each; re-check them alongside later evals:
-  - Main said "I start items 1 and 2 now" and ended the turn. One prompt held a git op plus three tasks and got only `Flow: Git`. Candidate Done-when line: "a reply that says work continues ends with that work started".
-  - 9 of 10 workers got a per-call `opus` with no "Raise when" cell for it ($28.12 with advisor, 62%); every opus slice still drew P1s. A reviewer ran on its sonnet default over opus-written commits, which `agent-no-downgrade` cannot see. Candidates: a worker "Raise when" cell, and a reviewer-below-author check.
-  - The Exit Stop hook also blocks a turn that only waits for a background agent (L4525), which forced an Exit on unfinished work. Candidate: skip a turn whose last `Agent` call is still running.
-  - 60 of 188 main requests were Poll-only ($1.63, 26% of main) against 5 to 6% in review-20261123. Candidate line in `## Subagents` Wait: in Code Mode, end the turn while a background agent runs.
-  - Concurrent pytest runs on one test database deadlocked 4 times. Fix lives in the schools repo (`flock` around `backend-check` and `backend-test`), not here.
-  - A local command such as `/reload-plugins` starts a new turn for `flow-skill-check` and `reviewer-gate`, so a task's Exit after it goes unchecked (line 4535 of 7f560b1a).
+Open findings are GitHub issues with the label `audit`: `gh issue list --repo vixduong/armarium --label audit`. Every `/claude-md-audit` run re-checks them against its session (the "Open issues" check of the skill) and files its own one-session findings there.
 
-- `explorer`, `tester` and `evidence-auditor` also show 0 calls. `explorer` stays, because it is meant to keep code search cheap; the reason it is never picked is not known yet.
-- The cost of the full config: about 1.2× (backend task) to 1.6× (UI task) the bare cost in run 2, down from 1.9× in run 1.
-- Not re-run yet: the Small tier and the new UI and Video wording (November eval above).
-- Not measured: whether skipping the graph misses call sites in a large refactor, and whether three reviewers on every commit (another commenter's setup) catch more than one reviewer on big diffs.
+- Outside this repo: concurrent pytest runs on one test database deadlocked 4 times in the 7f560b1a session. The fix lives in the schools repo (`flock` around `backend-check` and `backend-test`).
+  - 9 of 10 workers got a per-call `opus` with no "Raise when" cell for it ($28.12 with advisor, 62%); every opus slice still drew P1s. A reviewer ran on its sonnet default over opus-written commits, which `agent-no-downgrade` cannot see. Candidates: a worker "Raise when" cell, and a reviewer-below-author check.  - 60 of 188 main requests were Poll-only ($1.63, 26% of main) against 5 to 6% in review-20261123. Candidate line in `## Subagents` Wait: in Code Mode, end the turn while a background agent runs.  - A local command such as `/reload-plugins` starts a new turn for `flow-skill-check` and `reviewer-gate`, so a task's Exit after it goes unchecked (line 4535 of 7f560b1a).- Not re-run yet: the Small tier and the new UI and Video wording (November eval above).

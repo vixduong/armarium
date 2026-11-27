@@ -26,7 +26,7 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
    - A mechanical failure (a fixed pattern, a missing ignore, a banned command) gets a hook or check, not prose.
    - A judgement failure gets one sentence, in the single place that owns that rule.
    - Two instructions that conflict get resolved in one of them, never both.
-   - Evidence from one session (n = 1) goes under "Still open", not into a rule.
+   - Evidence from one session (n = 1) goes under "Still open", not into a rule. Once the user has the report, each such item becomes an issue: `gh issue create --repo vixduong/armarium --label audit`.
 
 7. **Report** to `/Users/Shared/claude-evals/session-<id8>/report.md`, never inside the project repo. Sections in this order:
    - outcome and cost table
@@ -56,3 +56,4 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
 - **Friction**: each hook block, fold, denial or tool error, traced to its layer. A block repeated by the same agent means that agent's prompt lacks the rule. The script's event counts are upper bounds: Code Mode repeats a result inside its REPL event, so count distinct commands before quoting a number.
 - **Verification**: the main re-ran the gate itself rather than trusting a worker's report.
 - **Never triggered** (two or more sessions): rules, agents, hooks or plugin tools with zero hits. These are candidates for retro's no-ops category.
+- **Open issues**: `gh issue list --repo vixduong/armarium --label audit --state open`, each one against this session. Seen again → comment with the evidence; a second session moves it out of "Still open" into a proposed fix. The session ran under its fix → say whether the fix held, and close it if it did. Else n/a.
