@@ -227,6 +227,7 @@ The session that applied the audit fixes above, pulled upstream's new layout mid
 | Intent-to-add (`bin/check`) | `test_write_fold_guard.py` was staged as an empty intent-to-add entry; pre-commit passed because `bin/check` reads the work tree, and the commit would have left the test out | the review of 4b447451 (blob `e69de29`) | With anything staged, a `git add -N` file fails the gate |
 | One fold list (`hooks/fold_formats.py`) | context-mode's new Read fold ("is stored as …") reached `write-fold-guard` only; `session_audit.py` kept its own pattern and stopped counting it | the first review of 4b447451 (P1 and P2) | Both import the list from `hooks/fold_formats.py`; the audit self-test has a stored-output fold |
 | Plan file current (Code Done-when) | The review-fix round never reached the plan file, which still named the old `claude/hooks/` paths, yet the Exit gave the plan item ✓ | 4b447451 `plan.md` | The item asks for a plan file current with the last fix round |
+| Plugins in Code Mode (`skills/claude-md-audit` Checks) | rtk turned a script's `git stash create` into "ok stash create", so the reviewer got no SHA; context-mode put a pointer into a script variable where `file().text()` should have returned the file. Neither plugin's docs mention Claude Code's REPL | 4b447451 evals 154 and 55; context-mode 2.2.1 README (its "Code Mode" is `ctx_execute`), `~/.claude/RTK.md` | New audit check: each plugin, CLI hook and pi extension, its matchers and docs, against what REPL scripts received |
 
 ## Changed by the owner's choice (2026-11-27)
 
