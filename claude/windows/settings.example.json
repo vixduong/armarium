@@ -59,23 +59,7 @@
             "type": "command",
             "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
             "args": [
-              "C:/Users/YOU/.claude/hooks/bash-ban-raw-tools.py"
-            ],
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
-            "args": [
-              "C:/Users/YOU/.claude/hooks/bash-ban-shell-writes"
-            ],
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
-            "args": [
-              "C:/Users/YOU/.claude/hooks/run_cli_hook.py",
+              "C:/Users/YOU/.claude/hooks/bash_gate.py",
               "rtk",
               "hook",
               "claude"
