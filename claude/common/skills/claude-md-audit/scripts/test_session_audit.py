@@ -81,4 +81,87 @@ check('hook system messages', any('no CBM daemon' in k for k in hm), hm)
 p = subprocess.run([sys.executable, '-I', SCRIPT, main], capture_output=True, text=True)
 check('text run exits 0', p.returncode == 0, p.stderr)
 check('text shows loaded files and fold follow-up', '/u/.nvm/CLAUDE.md' in p.stdout and 'folds' in p.stdout, p.stdout[-300:])
+
+# A second transcript: two prompts, a Flow line, a skill before the first write, one real hook block (shown twice, as
+# Code Mode does) beside hook source that only quotes the word, a cold cache write after a long gap, and an Exit list.
+BLOCK = "Permission denied for Bash: PreToolUse:Bash hook error: [~/.claude/hooks/bash-ban-shell-writes]: BLOCKED: 'echo > f' writes a file from Bash."
+
+
+def at(row, ts):
+    row['timestamp'] = '2026-11-23T' + ts + 'Z'
+    return row
+
+
+def says(req, text, ts, model='claude-fable-5-2', **kw):
+    row = at(asst(req, model, 'Read', 'x' + req, **kw), ts)
+    row['message']['content'] = [{'type': 'text', 'text': text}]
+    return row
+
+
+def calls(req, tool, inp, ts, **kw):
+    row = at(asst(req, 'claude-fable-5-2', tool, 'x' + req, **kw), ts)
+    row['message']['content'][0]['input'] = inp
+    return row
+
+
+def prompt(text, ts):
+    return at({'type': 'user', 'message': {'content': text}}, ts)
+
+
+def failed(tid, text):
+    row = result(tid, text)
+    row['message']['content'][0]['is_error'] = True
+    return row
+
+
+two = os.path.join(d, 'two.jsonl')
+os.makedirs(os.path.join(d, 'two', 'subagents'))
+rows = [
+    prompt('do the thing', '10:00:00'),
+    says('q1', 'Flow: Code flow (`tdd`)', '10:00:05', cr=1000),
+    calls('q2', 'Skill', {'skill': 'tdd'}, '10:00:10', cr=1000),
+    calls('q3', 'Write', {'file_path': '/repo/a.py'}, '10:00:20', cr=1000),
+    calls('q4', 'Bash', {'command': 'echo > f'}, '10:00:30', cr=1000), failed('xq4', BLOCK),
+    calls('q5', 'REPL', {}, '10:00:40', cr=1000), result('xq5', '- "Bash", refused: "' + BLOCK.replace('>', '&gt;') + '\n"'),  # Code Mode escapes it
+    calls('q6', 'Read', {'file_path': '/repo/hook'}, '10:00:50', cr=1000), result('xq6', 'print("BLOCKED: %s writes a file")\nBLOCK = "' + BLOCK.replace('echo', 'cat') + '"'),  # hook source, and a test file that quotes a block
+    says('q7', 'Done.\n\n## Exit\n\n- ✓ gate green: `bin/check` exit 0', '10:01:00', cr=1000),
+    prompt('commit', '11:30:00'),
+    calls('q8', 'Write', {'file_path': '/repo/b.py'}, '11:30:05', cw=150000),
+    {**prompt('<task-notification>\n<task-id>b1</task-id>', '11:30:07'), 'origin': {'kind': 'task-notification'}},  # not a prompt
+    prompt('<local-command-stdout>Set model</local-command-stdout>', '11:30:08'),  # nor is this
+    calls('q9', 'Read', {'file_path': '/repo/b.py'}, '11:30:10', cr=450000),
+    says('q10', 'Checks so far:\n- ✓ pushed', '11:30:20'),
+    says('q11', '## Exiting early is not a list. No list in the last reply.', '11:30:30'),
+]
+open(two, 'w').write('\n'.join(json.dumps(r) for r in rows) + '\n')
+review = '## Review\n\nNo P0 found.\n- P0-only re-check ran: none\n- HIGH-level summary\n\n**P1. One** a\n- **Finding P1: two**\n**1. HIGH: three**\n**Finding: MEDIUM, four.**'
+sub2 = os.path.join(d, 'two', 'subagents', 'agent-1.jsonl')
+open(sub2, 'w').write(json.dumps(says('v1', review, '10:00:45', model='claude-opus-5-5', cr=19000)) + '\n')
+json.dump({'agentType': 'reviewer', 'description': 'review it'}, open(sub2[:-6] + '.meta.json', 'w'))
+
+p = subprocess.run([sys.executable, '-I', SCRIPT, two, '--json'], capture_output=True, text=True)
+check('second transcript: json run exits 0', p.returncode == 0, p.stderr)
+data = json.loads(p.stdout) if p.returncode == 0 else {'agents': [[0, 0, {}], [0, 0, {}]], 'main': {}}
+t = data['main'].get('turns') or []
+t = t if len(t) == 2 else [{}, {}]
+check('one turn per prompt', len(data['main'].get('turns') or []) == 2, data['main'].get('turns'))
+check('Flow line before the first tool call, per turn', t[0].get('flow_first') is True and t[1].get('flow_first') is False, (t[0].get('flow_first'), t[1].get('flow_first')))
+check('skill called before the first write', t[0].get('skills_before_write') == ['tdd'] and t[0].get('writes') == 1 and t[1].get('skills_before_write') == [], t)
+check('turn cost: a cold write plus a read', abs(t[1].get('usd', 0) - 1.59) < 0.005, t[1].get('usd'))
+check('a turn keeps its Exit list', '✓ gate green' in (t[0].get('exit') or '') and not t[1].get('exit'), (t[0].get('exit'), t[1].get('exit')))
+m = data['agents'][0][2]
+bands = m.get('bands') or {}
+check('requests and cost per context band', bands.get('400-600k', [0])[0] == 1 and bands.get('<200k', [0])[0] == 10, bands)
+check('turn costs add up to the agent cost', abs(sum(x.get('usd', 0) for x in t) - m.get('usd', -1)) < 0.011, (t[0].get('usd'), t[1].get('usd'), m.get('usd')))
+cold = m.get('cold') or [{}]
+check('cold cache write with the gap before it', len(cold) == 1 and cold[0].get('tokens') == 150000 and cold[0].get('gap_min') == 89, cold)
+blocks = data['main'].get('blocks') or []
+check('one real hook block, counted once', len(blocks) == 1 and 'echo > f' in blocks[0] and data['main'].get('events', {}).get('hook_block') == 1, (blocks, data['main'].get('events')))
+check('severity counts from a subagent final message', data['agents'][1][2].get('sev') == {'P1': 2, 'HIGH': 1, 'MEDIUM': 1}, data['agents'][1][2].get('sev'))
+
+p = subprocess.run([sys.executable, '-I', SCRIPT, two, '--turns', '--exits'], capture_output=True, text=True)
+check('--turns prints a row per prompt', p.returncode == 0 and '1.59' in p.stdout and 'commit' in p.stdout, p.stdout[-400:] + p.stderr[-200:])
+check('--exits prints the Exit lists', '✓ gate green' in p.stdout, p.stdout[-300:])
+p = subprocess.run([sys.executable, '-I', SCRIPT, two], capture_output=True, text=True)
+check('default text: distinct hook blocks, bands, no Exit lists', 'hook blocks: 1' in p.stdout and '400-600k' in p.stdout and '✓ gate green' not in p.stdout, p.stdout[-400:])
 sys.exit(1 if fails else 0)

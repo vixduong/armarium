@@ -201,6 +201,7 @@ A Fable main session worked on this repo for 7 hours: a whole-repo review, 12 co
 |---|---|---|---|
 | `autoCompactWindow` 400k for Fable (`~/.claude/settings.json`, `modelSettings`) | A 7-hour session grew to 769k tokens of context with no compaction. Opus and Sonnet already had the 400k window; Fable had none | audit of session `09dd1875`: 125 of 244 main requests ran above 400k and cost 40.16 of 58.68 USD, and one cache rewrite of 672,616 tokens cost 10.76 USD. `session-0fb097b2` had the same finding | Fable gets `autoCompactWindow: 400000` |
 | `claudeMdExcludes` for `claude/common/CLAUDE.md` (`~/.claude/settings.json`) | `~/.claude/CLAUDE.md` is a symlink into this repo, so a session that read a file under `claude/common/` loaded the rules twice (15,293 and 15,294 chars) | audit of session `09dd1875`; a `claude -p` probe after the change loaded the User copy only | The repo copy is excluded by its absolute path |
+| Real hook blocks and per-turn facts (`skills/claude-md-audit/scripts/session_audit.py`) | The script counted 9 `hook_block` events where 1 block was real: the rest were hook source and probe output printed into the transcript. The audit also took 7 one-off scripts for per-prompt cost, context bands, cold cache writes, Exit lists and reviewer findings | audit of session `09dd1875` and the retro of the audit session | The script counts each harness-reported block once, prints context bands, cold cache writes and finding labels, and takes `--turns` and `--exits` |
 
 ## Still open
 
