@@ -56,6 +56,23 @@ if blocked(r) and "250" not in r[1].get("reason", ""):
 if blocked(r) and "review-animations" not in r[1].get("reason", ""):
     fails += 1; print("FAIL reason names review-animations for animated diffs: %s" % r[1])
 
+# A Big code diff under prose rows only (Agent docs, Writing, ...) also needs the Code row, reviewer or not.
+DOCFLOW = text("Flow: Agent docs → `writing-for-agents`")
+r = run([asst(DOCFLOW, write("/r/convert.py", 250)), asst(agent("reviewer")), asst(text("done"))])
+if not blocked(r) or "Code" not in r[1].get("reason", ""): fails += 1; print("FAIL prose row + big code needs the Code row: %s" % (r,))
+r = run([asst(DOCFLOW, write("/r/convert.py", 250)), asst(text("done"))])
+if not blocked(r) or "reviewer" not in r[1].get("reason", "") or "Code row" not in r[1].get("reason", ""): fails += 1; print("FAIL no reviewer and no Code row: both reasons: %s" % (r,))
+r = run([asst(DOCFLOW, text("Flow: Code flow (feature: `tdd`)"), write("/r/convert.py", 250)), asst(agent("reviewer")), asst(text("done"))])
+if blocked(r): fails += 1; print("FAIL prose row beside a Code row: %s" % (r,))
+r = run([asst(text("Flow: Agent docs (`writing-for-agents`) + Code flow (`tdd`)"), write("/r/convert.py", 250)), asst(agent("reviewer")), asst(text("done"))])
+if blocked(r): fails += 1; print("FAIL prose and Code rows on one Flow line: %s" % (r,))
+r = run([asst(text("Flow: Plan or spec only → Code flow steps 1, 3, 4"), write("/r/convert.py", 250)), asst(agent("reviewer")), asst(text("done"))])
+if not blocked(r): fails += 1; print("FAIL the Plan row's 'Code flow steps' is not a Code row: %s" % (r,))
+r = run([asst(text("Flow: Plan or spec only"), write("/r/spec.md", 900)), asst(text("done"))])
+if blocked(r): fails += 1; print("FAIL prose row, markdown only: %s" % (r,))
+r = run([asst(DOCFLOW, write("/r/convert.py", 40)), asst(text("done"))])
+if blocked(r): fails += 1; print("FAIL prose row, small code: %s" % (r,))
+
 # Writes the transcript cannot see (REPL write()/edit(), subagents, Bash) are counted from git: files changed since the turn's prompt.
 def git(repo, *a): subprocess.run(["git", "-C", repo, *a], capture_output=True, check=True)
 def lines_file(path, n): open(path, "w").write("\n".join("y" for _ in range(n)) + "\n")

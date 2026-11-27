@@ -7,6 +7,9 @@ FAKE_HOME = tempfile.mkdtemp()
 atexit.register(shutil.rmtree, FAKE_HOME, True)
 for n in ("tdd", "lean-build"):
     os.makedirs(os.path.join(FAKE_HOME, ".claude", "skills", n)); open(os.path.join(FAKE_HOME, ".claude", "skills", n, "SKILL.md"), "w").close()
+os.makedirs(os.path.join(FAKE_HOME, ".claude", "skills", "wayfinder"))  # a user-only skill: the model cannot call it
+with open(os.path.join(FAKE_HOME, ".claude", "skills", "wayfinder", "SKILL.md"), "w", newline="\r\n") as f:
+    f.write("---\nname: wayfinder\ndisable-model-invocation: true\n---\nbody\n")
 ENV = dict(os.environ, HOME=FAKE_HOME, USERPROFILE=FAKE_HOME)  # expanduser reads HOME on Unix, USERPROFILE on Windows
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "flow-skill-check")  # the hook beside this test, not the installed one
 
@@ -38,6 +41,10 @@ def blocked(r): return r[0] == 0 and r[1].get("decision") == "block"
 
 CASES = [  # (name, records, active, expect_block)
     ("both called", [asst(FLOW, skill("lean-build"), skill("tdd")), asst(DONE)], False, False),
+    ("a Code row that mentions answer directly still needs its skill", [asst(text("Flow: Code flow (`tdd`), not answer directly")), asst(DONE)], False, True),
+    ("answer-directly Flow needs no Exit", [asst(text("Flow: answer directly (code review, no file change)")), asst(text("review"))], False, False),
+    ("user-only skill needs no Skill call", [asst(text("Flow: Plan or spec only → `wayfinder`")), asst(DONE)], False, False),
+    ("user-only skill beside a normal one", [asst(text("Flow: Plan or spec only → `wayfinder`, `tdd`")), asst(DONE)], False, True),
     ("none called", [asst(FLOW), asst(text("done"))], False, True),
     ("one missing", [asst(FLOW, skill("lean-build")), asst(text("done"))], False, True),
     ("called in REPL code", [asst(FLOW, repl("await tools.Skill({skill: 'lean-build'}); await tools.Skill({skill:\"tdd\"})")), asst(DONE)], False, False),

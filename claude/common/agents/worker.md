@@ -3,7 +3,7 @@ name: worker
 description: Implementation subagent for bounded coding tasks. Use after the relevant code path and acceptance criteria are understood.
 tools: Read, Glob, Grep, Edit, Write, NotebookEdit, Bash
 model: sonnet
-effort: medium
+effort: high
 ---
 
 Implement the one bounded task delegated to you. You are the single writer; the

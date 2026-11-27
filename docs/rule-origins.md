@@ -203,6 +203,27 @@ A Fable main session worked on this repo for 7 hours: a whole-repo review, 12 co
 | `claudeMdExcludes` for `claude/common/CLAUDE.md` (`~/.claude/settings.json`) | `~/.claude/CLAUDE.md` is a symlink into this repo, so a session that read a file under `claude/common/` loaded the rules twice (15,293 and 15,294 chars) | audit of session `09dd1875`; a `claude -p` probe after the change loaded the User copy only | The repo copy is excluded by its absolute path |
 | Real hook blocks and per-turn facts (`skills/claude-md-audit/scripts/session_audit.py`) | The script counted 9 `hook_block` events where 1 block was real: the rest were hook source and probe output printed into the transcript. The audit also took 7 one-off scripts for per-prompt cost, context bands, cold cache writes, Exit lists and reviewer findings | audit of session `09dd1875` and the retro of the audit session | The script counts each harness-reported block once, prints context bands, cold cache writes and finding labels, and takes `--turns` and `--exits` |
 
+## Changed after the 0a8a49a6 and ebf9a37f session audits (2026-11-27)
+
+Two sibft sessions, 2026-11-25 and 26: a PowerShell fix ($1.98) and a two-day wayfinder map with 6 handoff specs ($113.76). Reports: `claude-evals/session-0a8a49a6`, `session-ebf9a37f` and `tong-hop-0a8a49a6-ebf9a37f.md`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Code row for code inside a prose task (`hooks/reviewer-gate`) | Both sessions picked a lighter row than the diff. reviewer-gate forced the review both times, but nothing asked for a plan or a red test: `convert.py`, a generator, shipped under the Agent docs row with no test | ebf9a37f lines 1036, 1409, 2101; 0a8a49a6 line 739 | The hook also blocks once when the turn names only prose rows and its non-doc diff is not Small (over 80 lines or 2 files), reviewed or not |
+| Plan file for a Big diff (Code Done-when) | 0a8a49a6 ran a Big diff (503 lines, 7 files) with no plan, and no Done-when item showed the gap | 0a8a49a6 lines 739, 744 | New Done-when item: diff Big → the plan file is named, with its gate command |
+| Exit for a chat answer, user-only skills (`hooks/flow-skill-check`) | The hook asked for an Exit after `Flow: answer directly`, which CLAUDE.md exempts, and asked for a `Skill` call to `wayfinder`, which the model cannot call | 0a8a49a6 line 191; ebf9a37f lines 3431, 3446 | The hook skips `answer directly` lines and skills whose frontmatter has `disable-model-invocation: true` |
+| Writing a fold pointer over a file (`hooks/write-fold-guard`, new) | In Code Mode `file().text()` returned a context-mode pointer instead of the text. A script edited that string and wrote it back, and a 5.5 KB report became one line. Read denials hit 3 times in 0a8a49a6 and 5 times in ebf9a37f | audit session 4b447451, eval 55; ebf9a37f lines 111, 1711, 6872, 9482, 10348 | New PreToolUse Write/Edit hook: it refuses a short text that is a context-mode fold (a `ctx_search` pointer or a stored-output notice) or an rtk "hidden" summary |
+| Memory frontmatter `status:` (CLAUDE.md `## Context`) | 0 of 15 memory files in 8 project folders carried `status:`. The harness's own memory format has no such field and says to update a file in place | `grep -r status:` over `~/.claude/projects/*/memory` | The rule now says one decision per file with its reason, and a changed decision edits its file |
+| `general-purpose` tier (`agent-tuning.md`) | The table had no row for it. Spec writers ran on sonnet one day and on opus the next, $62.31 on opus, and the first review still found 6 P0 | ebf9a37f lines 4169, 5421, 6547 | New row: inherits the main model; sonnet / high for prose against settled decisions; opus / high when the text decides money, migration or a public contract |
+| ripgrep on Windows (machine) | `rg` was missing: 1 failure in 0a8a49a6, 8 in ebf9a37f | ebf9a37f lines 257-271 | Installed with winget (ripgrep 16.0.0); CLAUDE.md still routes text search to `git grep -n` |
+
+## Changed by the owner's choice (2026-11-27)
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| `worker` tier (`agent-tuning.md`, `agents/worker.md`, `pi/settings.example.json`) | Raised from sonnet / medium by the owner's choice, not by a measurement | the owner's request in session 4b447451 | Default sonnet / high; the haiku drop for mechanical edits stays |
+| `reviewer` tier (`agent-tuning.md`, `agents/reviewer.md`, pi) | Raised from sonnet / high by the owner's choice, not by a measurement (upstream 8c62930). On sonnet, `medium` rated a real crash P2 where `high` rated it P1, so watch for the same on opus | reviewer-cmp, 2026-11-12 | Default opus / medium; high when an opus/medium review missed a bug or the diff is hard to undo |
+
 ## Still open
 
 Open findings are GitHub issues with the label `audit`: `gh issue list --repo vixduong/armarium --label audit`. Every `/claude-md-audit` run re-checks them against its session (the "Open issues" check of the skill) and files its own one-session findings there.

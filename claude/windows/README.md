@@ -11,7 +11,7 @@
 | `hooks/memory_repo_symlink.py` | `hooks/memory-repo-symlink` (a junction, so no admin rights are needed) |
 | `hooks/codemode_ponytail_band.py` | `hooks/codemode-ponytail-band`; its self-test is `claude/common/hooks/test_codemode_ponytail_band.py`, which runs this port on Windows |
 
-`agent-no-downgrade`, `bash-ban-shell-writes`, `flow-skill-check`, `reviewer-gate`, `skill-model-invocable` and `armarium-links` are Python and run as they are, called with `python`. The ones that start `git` find it with `path_only.py`, which reads only the absolute PATH entries, because Windows would otherwise run a `git.exe` from the project folder.
+`agent-no-downgrade`, `bash-ban-shell-writes`, `flow-skill-check`, `reviewer-gate`, `write-fold-guard`, `skill-model-invocable` and `armarium-links` are Python and run as they are, called with `python`. The ones that start `git` find it with `path_only.py`, which reads only the absolute PATH entries, because Windows would otherwise run a `git.exe` from the project folder.
 
 ## Install
 

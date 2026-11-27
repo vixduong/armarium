@@ -68,6 +68,16 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/Users/YOU/.claude/hooks/write-fold-guard",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "Stop": [

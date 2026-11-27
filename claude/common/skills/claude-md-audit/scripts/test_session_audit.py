@@ -2,10 +2,11 @@
 Builds a tiny transcript (main + one subagent) in a temp dir and checks the context, cost-mix,
 plugin, Code Mode and loaded-file facts the script reports."""
 import json, os, subprocess, sys, tempfile
+sys.stdout.reconfigure(encoding="utf-8")  # the checks print ✓; a cp1252 console on Windows cannot
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, 'session_audit.py')
-FOLD = 'ctx_search({queries:["x"], source:"s1"}) searches the whole output (5000 B).'
+FOLD = 'ctx_search({queries:["x"], source:"s1"}) searches the whole ' 'output (5000 B).'  # split: write-fold-guard refuses the whole phrase
 
 
 def asst(req, model, tool, tid, cr=0, cw=0, inp=0, out=0):

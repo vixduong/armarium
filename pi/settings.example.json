@@ -52,7 +52,7 @@
       },
       "worker": {
         "model": "pi-claude-cli/claude-sonnet-5-5",
-        "thinking": "medium"
+        "thinking": "high"
       },
       "evidence-auditor": {
         "model": "pi-claude-cli/claude-sonnet-5-5",

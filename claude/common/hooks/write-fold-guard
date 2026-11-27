@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+# PreToolUse Write/Edit gate: refuse to write a fold pointer in place of a file's text. In Code Mode, file().text() or a
+# $ result can come back as context-mode's ctx_search pointer or rtk's "+N hidden" summary instead of the content, and a
+# script that edits that string and writes it back wipes the file (2026-11-26 audit: a 5.5 KB report became one line).
+# Only short texts are checked, so a long document that quotes a pointer still writes.
+# Self-test: python3 -I ~/.claude/hooks/test_write_fold_guard.py
+import json, re, sys
+
+FOLD = re.compile(r"ctx_search\(\{queries:.*?\}\) searches the whole output"  # context-mode, Bash/REPL fold
+                  r"|is stored as \w+; above is the best-matching part"  # context-mode, Read fold
+                  r"|\[\+\d+ hidden: rtk recall [0-9a-f]+\]", re.S)  # rtk
+MAX = 4000  # a pointer is ~0.5 KB, an rtk summary a few lines; real files that merely quote one are longer
+
+try:
+    data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+except Exception:
+    sys.exit(0)  # malformed input must not block work
+if not isinstance(data, dict) or data.get("tool_name") not in ("Write", "Edit", "MultiEdit"):
+    sys.exit(0)
+inp = data.get("tool_input")
+if not isinstance(inp, dict):
+    sys.exit(0)
+texts = [inp.get("content"), inp.get("new_string")] + [e.get("new_string") for e in (inp.get("edits") if isinstance(inp.get("edits"), list) else []) if isinstance(e, dict)]
+for t in texts:
+    if isinstance(t, str) and len(t) < MAX and FOLD.search(t):
+        sys.stderr.write(
+            "BLOCKED: the text to write is a fold pointer (context-mode ctx_search or rtk recall), not the file's content: "
+            "the read that produced it was folded. Read the file with file().slice(offset, limit) or Read with offset/limit, "
+            "then write.\n")
+        sys.exit(2)
+sys.exit(0)

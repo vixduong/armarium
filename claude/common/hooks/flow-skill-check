@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Stop gate: every skill a `Flow:` line names in backticks needs, after the last Flow line that names it,
 # a `Skill` call or a reply listing it as ✗ (CLAUDE.md Exit). A `/skill` command the user typed to start
-# that task counts as the call. Only names that exist under ~/.claude/skills are checked.
+# that task counts as the call. Only names that exist under ~/.claude/skills are checked, minus user-only skills
+# (disable-model-invocation: true), which the model cannot call. A `Flow: answer directly` line needs no Exit.
 # Only Flow lines after the last user message are checked. Blocks once; stop_hook_active lets the retry through.
 # A turn with a Flow line must also end on a reply holding a ✓ or ✗ line: the Exit's Done-when list. A ✓ item (its line
 # and indented sub-bullets) that names an exception blocks: CLAUDE.md Exit makes it ✗. A turn whose cwd repo changed
@@ -17,6 +18,17 @@ NAME = re.compile(r"`([\w.-]+)`")
 EXCEPTION = re.compile(r"(?<!\w)(?:except|but|unless|apart from|(?<!loại )trừ|nhưng)(?!\w)", re.I)  # not "only": the Git row's Done-when says it
 ITEM = re.compile(r"\s*(?:(?:[-*]|\d+\.)\s*)?(?:\*\*\s*)?([✓✗])")  # an Exit item starts with its mark; prose may quote one
 EXCLUSIONS = re.compile(r"exclu|loại trừ", re.I)  # the Report row's "exclusions stated" item lists what it excludes
+USER_ONLY = re.compile(r"^disable-model-invocation:\s*true\s*$", re.M)
+
+def checked(n):
+    """A skill the model can call: its SKILL.md exists and its frontmatter does not reserve it for the user."""
+    path = os.path.join(SKILLS, n, "SKILL.md")
+    if n.startswith(".") or not os.path.isfile(path):
+        return False
+    with open(path, encoding="utf-8", errors="replace") as f:
+        head = f.read(4000).replace("\r\n", "\n").split("\n---", 1)[0]  # frontmatter only
+    return not USER_ONLY.search(head)
+
 FRONTEND = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "rules", "frontend.md")  # repo and ~/.claude alike
 
 def excepted(reply):
@@ -100,10 +112,10 @@ for i, (kind, value) in enumerate(events):
     if kind != "text":
         continue
     for ln in value.splitlines():
-        if ln.lstrip().startswith("Flow:"):
+        if ln.lstrip().startswith("Flow:") and not ln.split("Flow:", 1)[1].strip().lower().startswith("answer directly"):  # the chat row needs no Exit
             flows.append(i)
             for n in NAME.findall(ln):
-                if i > turn and os.path.isfile(os.path.join(SKILLS, n, "SKILL.md")):
+                if i > turn and checked(n):
                     last_flow[n] = i
 
 def satisfied(n, at):

@@ -13,7 +13,7 @@ My Claude Code setup in one repo: a global `CLAUDE.md`, `settings.json`, hooks, 
 - Every final reply lists the "done when" items, each marked with its evidence or the reason it failed.
 - A separate section covers when to use subagents, how to prompt them, and how to check what they report.
 
-Hooks enforce the rules a model tends to skip. `agent-no-downgrade`, `flow-skill-check`, `reviewer-gate`, `bash-ban-raw-tools` and `bash-ban-shell-writes` block a tool call or the end of a turn; five more run at session start, and `run-cli-hook` finds a CLI such as `rtk` for the others. [docs/hooks.md](docs/hooks.md) says what each one does, and [docs/rule-origins.md](docs/rule-origins.md) records the incident behind each rule.
+Hooks enforce the rules a model tends to skip. `agent-no-downgrade`, `flow-skill-check`, `reviewer-gate`, `write-fold-guard`, `bash-ban-raw-tools` and `bash-ban-shell-writes` block a tool call or the end of a turn; five more run at session start, and `run-cli-hook` finds a CLI such as `rtk` for the others. [docs/hooks.md](docs/hooks.md) says what each one does, and [docs/rule-origins.md](docs/rule-origins.md) records the incident behind each rule.
 
 ## What is inside
 

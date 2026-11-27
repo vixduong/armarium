@@ -10,12 +10,16 @@
 # touched this turn count too; snapshot numstat at UserPromptSubmit if that over-blocks.
 # Also step 8's security branch: a security-only reviewer prompt while `git rev-parse origin/HEAD` resolves in cwd and no
 # `security-review` call → block once, so the agent runs the skill instead of asserting origin/HEAD is missing.
+# A non-Small code diff whose turn names only prose rows (Agent docs, Writing, Report, ...) also needs the Code row, reviewed
+# or not: a generator or script inside a docs task gets no plan or red test otherwise.
 # Self-test: python3 -I ~/.claude/hooks/test_reviewer_gate.py
 import json, os, re, subprocess, sys
 from datetime import datetime
 from path_only import which
 
 DOCS = (".md", ".markdown", ".txt", ".rst")
+CODE_ROW = re.compile(r"\bcode flow\b(?! steps)")  # "Agent docs + Code flow" names the Code row; the Plan row's "Code flow steps 1, 3, 4" does not
+PROSE_ROWS = ("agent docs", "writing", "report", "research", "plan or spec", "answer directly", "question answered")  # Route rows with no Code flow
 REVIEW_IN_CODE = re.compile(r"""subagent_type\s*:\s*['"]reviewer['"]|skill\s*:\s*['"](?:[\w-]+:)?code-review['"]""")
 SECURITY = re.compile(r"\bsecurity[- ]only\b", re.I)  # step 8's own phrase for the reviewer that stands in for `security-review`
 SEC_SKILL_IN_CODE = re.compile(r"""skill\s*:\s*['"](?:[\w-]+:)?security-review['"]""")
@@ -60,7 +64,7 @@ try:
     data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     if data.get("stop_hook_active"):
         sys.exit(0)
-    per_file, flow, reviewed, since = {}, False, False, None
+    per_file, flow, reviewed, since, rows = {}, False, False, None, []
     after_edit = False  # whether a transcript edit of this turn preceded a review
     sec_reviewer = sec_skill = False  # step 8: `git rev-parse origin/HEAD` succeeds → `security-review`, not a security-only reviewer
     with open(data.get("transcript_path") or "", encoding="utf-8") as f:
@@ -76,7 +80,7 @@ try:
                 typed = isinstance(content, str) or (isinstance(content, list) and not any(
                     isinstance(b, dict) and b.get("type") == "tool_result" for b in content))  # list: text + image
                 if typed and not r.get("isMeta") and (r.get("origin") or {}).get("kind", "human") == "human":
-                    per_file, flow, reviewed = {}, False, False  # a new prompt starts a new turn
+                    per_file, flow, reviewed, rows = {}, False, False, []  # a new prompt starts a new turn
                     after_edit = False
                     sec_reviewer = sec_skill = False
                     try:
@@ -87,8 +91,11 @@ try:
             if r.get("type") != "assistant" or not isinstance(content, list):
                 continue
             for b in content:
-                if b.get("type") == "text" and any(ln.lstrip().startswith("Flow:") for ln in b.get("text", "").splitlines()):
-                    flow = True
+                if b.get("type") == "text":
+                    for ln in b.get("text", "").splitlines():
+                        if ln.lstrip().startswith("Flow:"):
+                            flow = True
+                            rows.append(ln.split("Flow:", 1)[1].strip().lower())
                 if b.get("type") != "tool_use":
                     continue
                 name, inp = b.get("name"), b.get("input") or {}
@@ -143,6 +150,10 @@ if flow and not reviewed and (changed > 80 or len(per_file) > 2):
     reasons.append("This turn changed %d lines in %d files, which is not Small (Code flow step 8), but no `reviewer` ran on those edits. "
         "Run the `reviewer` agent on the diff now and fix its P0/P1; animation in the diff → also `review-animations`. "
         "A ✗ in the Exit does not replace the review." % (changed, len(per_file)))
+if flow and rows and all(r.startswith(PROSE_ROWS) and not CODE_ROW.search(r) for r in rows) and (changed > 80 or len(per_file) > 2):
+    reasons.append("Its Flow lines name only prose rows, but %d lines in %d files are code: add the Code row for them "
+        "(Route: several deliverables → one row each), with a plan file when Big, each behavior's test red before its code, "
+        "and that row's Done-when in the Exit." % (changed, len(per_file)))
 if origin_head:
     reasons.append("A security-only `reviewer` ran, but `git rev-parse origin/HEAD` resolves here, so Code flow step 8 picks "
         "`security-review`. Call it now, or list it ✗ in the Exit with the error it gave.")
