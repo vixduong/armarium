@@ -5,6 +5,7 @@ Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows
 - JSON: every settings.example.json (claude/unix, claude/windows, pi) parses; so do .pi/settings.json and pi/package.json,
   and the local packages and extensions they name exist. A self-test is cut off after 900 s (CHECK_TEST_TIMEOUT).
 - Settings: every ~/.claude/... path a setting calls exists in its OS dir or common/; unix hooks are executable.
+  Every Windows command hook is exec form: `args` set and `command` a full path (shell form starts Git Bash per hook).
 - Pointers: every `~/.claude/<file>` in common/ and unix/ *.md exists there or in ~/.claude; every bare `<name>.md` exists there.
 - Names: every Route lead-skill name, and every `plugin:skill` of an installed plugin, is an installed skill, an agent or built in;
   a plugin the settings declare but this machine lacks is skipped.
@@ -121,6 +122,13 @@ for f, data in settings.items():
                 problems.append("%s is not executable" % rel(target))
             if f == UNIX_SETTINGS and w.endswith("/skill-model-invocable"):
                 unlocked.update(words[i + 1:])
+
+# Exec form: a Windows hook as one string runs through Git Bash, one more process per hook; a bare name may resolve in the cwd
+for event, groups in ((settings.get(WINDOWS_SETTINGS) or {}).get("hooks") or {}).items():
+    for h in (h for g in groups for h in g.get("hooks", [])):
+        if h.get("type") == "command" and not (isinstance(h.get("args"), list) and h["args"] and ntpath.isabs(str(h.get("command", "")))):
+            problems.append("%s: %s hook %r is in shell form or names a bare program: set \"command\" to the full path of python.exe and \"args\" to the script and its arguments"
+                            % (WINDOWS_SETTINGS, event, h.get("command")))
 
 # Pointers
 names_in_repo = {os.path.basename(p) for d in (CLAUDE, UNIX) for p in glob.glob(os.path.join(d, "**", "*"), recursive=True)}

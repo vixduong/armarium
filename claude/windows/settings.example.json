@@ -44,8 +44,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/agent-no-downgrade",
-            "timeout": 15
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/agent-no-downgrade"
+            ],
+            "timeout": 30
           }
         ]
       },
@@ -54,18 +57,30 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/bash-ban-raw-tools.py",
-            "timeout": 15
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/bash-ban-raw-tools.py"
+            ],
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/bash-ban-shell-writes",
-            "timeout": 15
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/bash-ban-shell-writes"
+            ],
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/run_cli_hook.py rtk hook claude",
-            "timeout": 15
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/run_cli_hook.py",
+              "rtk",
+              "hook",
+              "claude"
+            ],
+            "timeout": 30
           }
         ]
       },
@@ -74,8 +89,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/write-fold-guard",
-            "timeout": 15
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/write-fold-guard"
+            ],
+            "timeout": 30
           }
         ]
       }
@@ -85,13 +103,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/flow-skill-check",
-            "timeout": 15
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/flow-skill-check"
+            ],
+            "timeout": 60
           },
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/reviewer-gate",
-            "timeout": 15
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/reviewer-gate"
+            ],
+            "timeout": 60
           }
         ]
       }
@@ -101,28 +125,44 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/armarium-links",
-            "timeout": 10
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/armarium-links"
+            ],
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/memory_repo_symlink.py",
-            "timeout": 10
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/memory_repo_symlink.py"
+            ],
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/skill-model-invocable review-animations",
-            "timeout": 10
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/skill-model-invocable",
+              "review-animations"
+            ],
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/cbm_session_reminder.py",
-            "timeout": 10
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/cbm_session_reminder.py"
+            ],
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "python C:/Users/YOU/.claude/hooks/codemode_ponytail_band.py",
-            "timeout": 5
+            "command": "C:/Users/YOU/AppData/Roaming/uv/data/python/cpython-3.13-windows-x86_64-none/python.exe",
+            "args": [
+              "C:/Users/YOU/.claude/hooks/codemode_ponytail_band.py"
+            ],
+            "timeout": 30
           }
         ]
       }

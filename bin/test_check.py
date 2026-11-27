@@ -105,7 +105,16 @@ case("windows settings call a file the repo lacks", 1, "hooks/gone.ps1",
          {"type": "command", "command": "powershell -File C:/Users/YOU/.claude/hooks/gone.ps1"}]}]}})})
 case("windows settings may call a shared python hook", 0, "check: ok",
      files={"claude/windows/settings.example.json": json.dumps({"hooks": {"Stop": [{"hooks": [
+         {"type": "command", "command": "C:/Python/python.exe", "args": ["C:/Users/YOU/.claude/hooks/good-hook"]}]}]}})})
+case("a windows hook in shell form starts Git Bash first", 1, "shell form",
+     files={"claude/windows/settings.example.json": json.dumps({"hooks": {"Stop": [{"hooks": [
          {"type": "command", "command": "python C:/Users/YOU/.claude/hooks/good-hook"}]}]}})})
+case("a windows hook in exec form with empty args starts a bare interpreter", 1, "shell form",
+     files={"claude/windows/settings.example.json": json.dumps({"hooks": {"Stop": [{"hooks": [
+         {"type": "command", "command": "C:/Python/python.exe", "args": []}]}]}})})
+case("a windows hook in exec form with a bare program name fails: the spawn may search the cwd", 1, "shell form",
+     files={"claude/windows/settings.example.json": json.dumps({"hooks": {"Stop": [{"hooks": [
+         {"type": "command", "command": "python", "args": ["C:/Users/YOU/.claude/hooks/good-hook"]}]}]}})})
 
 def plugins(installed, cache):
     """installed: {plugin: version} in Claude Code's install record. cache: {"plugin/version/path": text}."""
