@@ -183,7 +183,7 @@ def main_thread(path):
         if t == 'user' and not d.get('isMeta'):
             c = (d.get('message') or {}).get('content') or ''
             said = c if isinstance(c, str) else '' if any(x.get('type') == 'tool_result' for x in c) else ' '.join(x.get('text', '') for x in c if x.get('type') == 'text')
-            if said.strip() and not d.get('origin') and not said.lstrip().startswith(NOT_A_PROMPT):  # a prompt starts a turn; a notification or a local command's echo does not
+            if said.strip() and (d.get('origin') or {}).get('kind') in (None, 'human') and not said.lstrip().startswith(NOT_A_PROMPT):  # a prompt starts a turn; a notification or a local command's echo does not
                 turn = {'n': len(out['turns']) + 1, 'at': (d.get('timestamp') or '')[11:16], 'prompt': ' '.join(said.split())[:60], 'usd': 0.0,
                         'cache_write_usd': 0.0, 'req': 0, 'ctx': [0, 0], 'poll_only': 0, 'tools': 0, 'flow_first': False,
                         'skills_before_write': [], 'writes': 0, 'exit': ''}
@@ -248,6 +248,7 @@ def main_thread(path):
 
 
 def main():
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # prompts and Exit lists hold ✓ and non-ASCII text; a Windows console is cp1252
     args = sys.argv[1:]
     slug = args[args.index('--cwd-slug') + 1] if '--cwd-slug' in args else None
     path = find(args[0], slug)

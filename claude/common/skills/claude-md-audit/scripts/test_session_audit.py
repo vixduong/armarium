@@ -105,7 +105,7 @@ def calls(req, tool, inp, ts, **kw):
 
 
 def prompt(text, ts):
-    return at({'type': 'user', 'message': {'content': text}}, ts)
+    return at({'type': 'user', 'origin': {'kind': 'human'}, 'message': {'content': text}}, ts)  # a typed prompt carries this origin
 
 
 def failed(tid, text):
@@ -128,7 +128,7 @@ rows = [
     prompt('commit', '11:30:00'),
     calls('q8', 'Write', {'file_path': '/repo/b.py'}, '11:30:05', cw=150000),
     {**prompt('<task-notification>\n<task-id>b1</task-id>', '11:30:07'), 'origin': {'kind': 'task-notification'}},  # not a prompt
-    prompt('<local-command-stdout>Set model</local-command-stdout>', '11:30:08'),  # nor is this
+    {**prompt('<local-command-stdout>Set model</local-command-stdout>', '11:30:08'), 'origin': None},  # nor is this
     calls('q9', 'Read', {'file_path': '/repo/b.py'}, '11:30:10', cr=450000),
     says('q10', 'Checks so far:\n- ✓ pushed', '11:30:20'),
     says('q11', '## Exiting early is not a list. No list in the last reply.', '11:30:30'),
@@ -139,7 +139,7 @@ sub2 = os.path.join(d, 'two', 'subagents', 'agent-1.jsonl')
 open(sub2, 'w').write(json.dumps(says('v1', review, '10:00:45', model='claude-opus-5-5', cr=19000)) + '\n')
 json.dump({'agentType': 'reviewer', 'description': 'review it'}, open(sub2[:-6] + '.meta.json', 'w'))
 
-p = subprocess.run([sys.executable, '-I', SCRIPT, two, '--json'], capture_output=True, text=True)
+p = subprocess.run([sys.executable, '-I', SCRIPT, two, '--json'], capture_output=True, text=True, encoding='utf-8')  # the output holds ✓: Windows would decode it as cp1252
 check('second transcript: json run exits 0', p.returncode == 0, p.stderr)
 data = json.loads(p.stdout) if p.returncode == 0 else {'agents': [[0, 0, {}], [0, 0, {}]], 'main': {}}
 t = data['main'].get('turns') or []
@@ -159,9 +159,9 @@ blocks = data['main'].get('blocks') or []
 check('one real hook block, counted once', len(blocks) == 1 and 'echo > f' in blocks[0] and data['main'].get('events', {}).get('hook_block') == 1, (blocks, data['main'].get('events')))
 check('severity counts from a subagent final message', data['agents'][1][2].get('sev') == {'P1': 2, 'HIGH': 1, 'MEDIUM': 1}, data['agents'][1][2].get('sev'))
 
-p = subprocess.run([sys.executable, '-I', SCRIPT, two, '--turns', '--exits'], capture_output=True, text=True)
+p = subprocess.run([sys.executable, '-I', SCRIPT, two, '--turns', '--exits'], capture_output=True, text=True, encoding='utf-8')
 check('--turns prints a row per prompt', p.returncode == 0 and '1.59' in p.stdout and 'commit' in p.stdout, p.stdout[-400:] + p.stderr[-200:])
 check('--exits prints the Exit lists', '✓ gate green' in p.stdout, p.stdout[-300:])
-p = subprocess.run([sys.executable, '-I', SCRIPT, two], capture_output=True, text=True)
+p = subprocess.run([sys.executable, '-I', SCRIPT, two], capture_output=True, text=True, encoding='utf-8')
 check('default text: distinct hook blocks, bands, no Exit lists', 'hook blocks: 1' in p.stdout and '400-600k' in p.stdout and '✓ gate green' not in p.stdout, p.stdout[-400:])
 sys.exit(1 if fails else 0)
