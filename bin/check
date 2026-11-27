@@ -23,7 +23,7 @@ The last line counts the self-tests and those that printed a line starting with 
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
   unless skill-model-invocable unlocks it; a user-only skill is written `/name`.
 Self-test: python3 -I bin/test_check.py"""
-import ast, glob, json, ntpath, os, re, subprocess, sys
+import ast, concurrent.futures, glob, json, ntpath, os, re, subprocess, sys
 sys.stdout.reconfigure(errors="backslashreplace")  # a non-ASCII path in a FAIL line must not crash a cp1252 console
 
 REPO_ONLY = "--repo-only" in sys.argv
@@ -45,15 +45,29 @@ def rel(p):
 # Self-tests
 tests = sorted(glob.glob(os.path.join(CLAUDE, "hooks", "test_*.py")) + glob.glob(os.path.join(REPO, "bin", "test_*.py"))
                + glob.glob(os.path.join(CLAUDE, "skills", "*", "scripts", "test_*.py"))
+               + glob.glob(os.path.join(CLAUDE, "bin", "test_*.py"))
                + glob.glob(os.path.join(UNIX, "hooks", "test_*.py"))
                + glob.glob(os.path.join(WINDOWS, "hooks", "test_*.py"))
                + glob.glob(os.path.join(REPO, "pi", "test_*.py")))
 skipped = 0  # self-tests that left part of their work out and said so
 TEST_TIMEOUT = int(os.environ["CHECK_TEST_TIMEOUT"]) if os.environ.get("CHECK_TEST_TIMEOUT", "").isdigit() else 900  # s; wall clock, so generous: a laptop may nap mid-run
-for t in tests:
+SERIAL = {"test_cbm_session_reminder.py"}  # times its hook against a 9 s stub with a 1 s margin: runs first, alone
+
+
+def self_test(t):
     try:
-        p = subprocess.run([sys.executable, "-I", t], capture_output=True, text=True, timeout=TEST_TIMEOUT)
+        return subprocess.run([sys.executable, "-I", t], capture_output=True, text=True, timeout=TEST_TIMEOUT)
     except subprocess.TimeoutExpired:
+        return None
+
+
+serial = [t for t in tests if os.path.basename(t) in SERIAL]
+runs = {t: self_test(t) for t in serial}
+with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:  # each test runs in its own process
+    runs.update(zip([t for t in tests if t not in runs], pool.map(self_test, [t for t in tests if t not in runs])))
+for t in tests:  # path order, whichever finished first
+    p = runs[t]
+    if p is None:
         problems.append("%s timed out after %d s" % (rel(t), TEST_TIMEOUT))
         continue
     skipped += bool(re.search(r"(?mi)^skip", p.stdout))

@@ -4,6 +4,7 @@ name: check
 on:
   push:
   pull_request:
+  workflow_dispatch: # gh workflow run check.yml --ref <branch>: a Windows run without a new commit
 permissions:
   contents: read
 jobs:

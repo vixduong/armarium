@@ -1,7 +1,7 @@
 # Rules
 
 ## Route: the first line of every task
-Write `Flow: <row>` before the first tool call (a chat answer that calls no tool needs none; one that calls tools writes `Flow: answer directly`), then follow that flow; backticks in that line go only around skills you will load. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix takes at least the Small flow) → Clarify, Ripple, Verify of the Code flow only.
+Write `Flow: <row>` before the first tool call (a chat answer that calls no tool needs none; one that calls tools writes `Flow: answer directly`), then follow that flow; backticks in that line go only around skills you will load; a skill only a later branch may need stays bare. Several deliverables → one row each. Rows name the deliverable, not your phase: planning, building, fixing, reviewing or judging a video is the `Video` row, lead skill included (same for UI). Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row. Trivial (1 file, typo/rename/config value, no behavior change; a bug fix takes at least the Small flow) → Clarify, Ripple, Verify of the Code flow only.
 
 A skill is loaded with `read` on its SKILL.md (path in the skills list); that read is the skill call.
 
@@ -78,7 +78,7 @@ Main = coordinator: integrates + verifies. Model and thinking per agent live in 
 - **Delegate**: online research, refactor >2 files, summarize >1 file, audit, unknown-repo recon, big log triage. Inline: one chain of dependent steps, work that fits one context.
 - **Parallel**: max 3 (`workflow: "parallel"`); serial if dependent or same file; risky parallel writes → `worktree: true`.
 - **Wait**: next step needs the result → `async: false`. An async run wakes the session itself: never poll it.
-- **Prompt**: self-contained, <500 tok: goal + named files/symbols + constraint + acceptance check + return format. A `subagent` result is not folded (settings `contextMode.excludeTools`); pi-subagents cuts a long one and names the file that holds all of it: `read` that file. A diff goes in as a range the agent runs (`git diff <base> <sha>`; uncommitted work → the SHA `rtk proxy git stash create` prints (bare `git stash create` comes back as "ok"), new files `git add`ed first, so later edits leave the range fixed), never pasted.
+- **Prompt**: self-contained, <500 tok: goal + named files/symbols + constraint + acceptance check + return format. A `subagent` result is not folded (settings `contextMode.excludeTools`); pi-subagents cuts a long one and names the file that holds all of it: `read` that file. A diff goes in as a range the agent runs (`git diff <base> <sha>`; uncommitted work → the SHA `python3 -I ~/.claude/bin/snapshot.py` (Windows: `python`) prints, so later edits leave the range fixed), never pasted. A claim resting on a web page → save the page to the scratchpad and name its path: `reviewer` and `oracle` have no web tool.
 - **Pick** by description: `scout` = recon, `worker` = edits and verify-only test runs, `oracle` = decisions (~once per run), `reviewer` = review, `researcher` = web; `evidence-auditor` before a decision rests on `researcher` claims.
 - **Report = claim**: check the diff, re-run cited evidence, confirm the acceptance check passed.
 

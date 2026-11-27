@@ -1,6 +1,6 @@
 """Self-test for bin/check: python3 -I bin/test_check.py
 Each case builds a small fixture repo and a fake HOME, then expects check to pass or to name the problem."""
-import json, os, re, stat, subprocess, sys, tempfile
+import json, os, re, stat, subprocess, sys, tempfile, time
 
 CHECK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check")
 SETTINGS = {"hooks": {"SessionStart": [{"hooks": [
@@ -222,10 +222,33 @@ case("no pi on this machine: no warning", 0, "check: ok", absent="WARN", files=P
 case("--repo-only: no warning", 0, "check: ok", absent="WARN", args=["--repo-only"], files=PI_PKG, home_files=pi_settings([]))
 
 # a self-test that skips part of its work says so on a line starting with "skip": check counts those files
+case("a failing self-test beside a common/bin script", 1, "test_tool.py",
+     files={"claude/common/bin/test_tool.py": "import sys; sys.exit(1)\n"})
 case("a self-test that skips is counted", 0, "1 self-tests, 1 with a skip",
      files={"claude/common/hooks/test_partial.py": 'print("skip on Windows")\n'})
 case("no skip: the count line stays as it was", 0, "check: ok (1 self-tests)",
      files={"claude/common/hooks/test_whole.py": 'print("ok   skip-free")\n'})
+
+# self-tests run side by side, except the ones that time themselves, which run first and alone; failures keep path order
+LOGS = tempfile.mkdtemp()
+def timed(name):  # one log per test: appends from several processes are not atomic on Windows
+    return ("import time\nt = time.time(); time.sleep(1.5)\n"
+            "open(%r, 'w').write('%%f %%f' %% (t, time.time()))\n" % (os.path.join(LOGS, name)))
+case("self-tests run side by side", 0, "check: ok (4 self-tests)",
+     files={"claude/common/hooks/test_a.py": timed("a"), "claude/common/hooks/test_b.py": timed("b"),
+            "claude/common/hooks/test_c.py": timed("c"), "claude/common/hooks/test_cbm_session_reminder.py": timed("serial")})
+runs = {n: tuple(map(float, open(os.path.join(LOGS, n)).read().split())) for n in os.listdir(LOGS)}
+alone = all(runs["serial"][1] <= runs[n][0] or runs[n][1] <= runs["serial"][0] for n in "abc")
+side = max(runs[n][0] for n in "ab") < min(runs[n][1] for n in "ab")  # overlap, not wall time: a 2-CPU runner still overlaps two
+for label, ok in (("two plain self-tests overlap", side),
+                  ("the timing-sensitive self-test overlaps no other", alone)):
+    total += 1; fails += not ok
+    print(("ok   " if ok else "FAIL ") + label, "" if ok else "runs %s" % runs)
+repo, home = fixture(files={"claude/common/hooks/test_b.py": "import sys; sys.exit(1)\n", "claude/common/hooks/test_a.py": "import time, sys; time.sleep(1); sys.exit(1)\n"})
+rc, out = run(repo, home)
+ok = rc == 1 and 0 <= out.find("test_a.py failed") < out.find("test_b.py failed")
+total += 1; fails += not ok
+print(("ok   " if ok else "FAIL ") + "failures are listed in path order, whichever ends first", "" if ok else out[-300:])
 
 # pi: the tiers this machine runs (subagents.agentOverrides) and the ones pi/settings.example.json shows are the same
 def overrides(reviewer): return json.dumps({"packages": ["{HOME}/../repo/pi"], "subagents": {"agentOverrides": {
