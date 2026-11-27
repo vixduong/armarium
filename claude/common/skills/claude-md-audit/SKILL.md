@@ -26,6 +26,7 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
    - A mechanical failure (a fixed pattern, a missing ignore, a banned command) gets a hook or check, not prose.
    - A judgement failure gets one sentence, in the single place that owns that rule.
    - Two instructions that conflict get resolved in one of them, never both.
+   - A fix whose gain and cost only a run can weigh (a plugin, a hook, a model or effort choice) → an A/B kit under `~/projects/armarium-audits/evals/`, run with `/eval-kit`; the kit's verdict decides, not the audit.
    - Evidence from one session (n = 1) goes under "Still open", not into a rule. Once the user has the report, each such item becomes an issue: `gh issue create --repo vixduong/armarium --label audit`.
 
 7. **Report** to `/Users/Shared/claude-evals/session-<id8>/report.md`, never inside the project repo. Sections in this order:
