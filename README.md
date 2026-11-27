@@ -8,7 +8,7 @@ My Claude Code setup in one repo: a global `CLAUDE.md`, `settings.json`, hooks, 
 
 `CLAUDE.md` sorts every task into a flow before any work starts.
 
-- A Route table maps each kind of task (code, UI, report, writing, research, video, settings) to a flow, a lead skill and a list of "done when" items.
+- A Route table maps each kind of task (code, UI, scene, report, writing, research, video, settings) to a flow, a lead skill and a list of "done when" items.
 - Code work follows eight ordered steps: intake, clarify, explore and ripple, plan, delegate, TDD, verify, review.
 - Every final reply lists the "done when" items, each marked with its evidence or the reason it failed.
 - A separate section covers when to use subagents, how to prompt them, and how to check what they report.

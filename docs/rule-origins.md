@@ -237,6 +237,17 @@ The session that applied the audit fixes above, pulled upstream's new layout mid
 | `reviewer` tier (`agent-tuning.md`, `agents/reviewer.md`, pi) | Raised from sonnet / high by the owner's choice, not by a measurement (upstream 8c62930). On sonnet, `medium` rated a real crash P2 where `high` rated it P1, so watch for the same on opus | reviewer-cmp, 2026-11-12 | Default opus / medium; high when an opus/medium review missed a bug or the diff is hard to undo |
 | `reviewer` effort (`agent-tuning.md`, `CLAUDE.md` step 8, `pi/AGENTS.md`, `pi/settings.example.json`) | The main session runs at effort high while its reviewer ran at medium, one level below the code it judged; the owner flagged it | the owner's messages in session 4b447451 | Default stays opus / medium; a reviewer runs at least at the main session's effort, and one level above that when a review missed a bug or the diff is hard to undo. pi sets thinking only in settings, so its reviewer is pinned at the example's `defaultThinking` (high) |
 
+## Changed after the b8d423e5 retro (2026-11-27)
+
+A sign-in screen got a Three.js schoolyard behind it. The code passed every check, and the owner said the picture looked robot-like.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Scene gate (`rules/scene.md`, the Scene row in `CLAUDE.md` and `pi/AGENTS.md`) | The scene took the UI row, whose Done-when asks for a screenshot at each width and says nothing about the look. Tested modules were built first, so the first screenshot was viewed at tool call 347 of about 1,170. Nobody asked for a reference; the owner sent one after the first build. The reviewer got the diff and an acceptance list with no look item, and returned 14 code findings | b8d423e5: the transcript's tool calls counted by script (questions at call 39, first image at 347, first reviewer at 775); the plan's Acceptance section in the project repo | A gate that puts the look first: reference pack, medium, hero still, look loop, a look-only `reviewer` call, frame strips for motion, frame budget last |
+| A picture drawn by code takes the Scene row (Route intro and UI row, `CLAUDE.md` and `pi/AGENTS.md`) | "Animation inside an app's UI (CSS, canvas, WebGL scene) is the UI row" sent a 4,477-line scene down the UI row | b8d423e5, `git show --stat` of the scene commit | That sentence now sends a 3D scene, illustration or shader background to the Scene row; the page around it stays UI |
+| `review-animations` judges UI motion (`rules/frontend.md` step 6) | The skill checks durations, easing and origin of UI transitions. Called on the scene, it had nothing to say about stiff figures | b8d423e5, the `review-animations` call at 776 | Step 6 names UI animation; a scene's motion is scene gate step 6 |
+| The gate names no Three.js skill (`rules/scene.md`) | Six public skill repos were checked: none takes the owner's reference or compares a render with it | `docs/scene-gate-research.md` | The gate stands alone and ends with four technique links |
+
 ## Still open
 
 Open findings are GitHub issues with the label `audit`: `gh issue list --repo vixduong/armarium --label audit`. Every `/claude-md-audit` run re-checks them against its session (the "Open issues" check of the skill) and files its own one-session findings there.
