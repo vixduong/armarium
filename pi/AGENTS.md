@@ -78,7 +78,7 @@ Main = coordinator: integrates + verifies. Model and thinking per agent live in 
 - **Delegate**: online research, refactor >2 files, summarize >1 file, audit, unknown-repo recon, big log triage. Inline: one chain of dependent steps, work that fits one context.
 - **Parallel**: max 3 (`workflow: "parallel"`); serial if dependent or same file; risky parallel writes → `worktree: true`.
 - **Wait**: next step needs the result → `async: false`. An async run wakes the session itself: never poll it.
-- **Prompt**: self-contained, <500 tok: goal + named files/symbols + constraint + acceptance check + return format under 4 KB (a longer `subagent` result comes back folded). A diff goes in as a range the agent runs (`git diff <base>`), never pasted.
+- **Prompt**: self-contained, <500 tok: goal + named files/symbols + constraint + acceptance check + return format. A `subagent` result is not folded (settings `contextMode.excludeTools`); pi-subagents cuts a long one and names the file that holds all of it: `read` that file. A diff goes in as a range the agent runs (`git diff <base>`), never pasted.
 - **Pick** by description: `scout` = recon, `worker` = edits and verify-only test runs, `oracle` = decisions (~once per run), `reviewer` = review, `researcher` = web; `evidence-auditor` before a decision rests on `researcher` claims.
 - **Report = claim**: check the diff, re-run cited evidence, confirm the acceptance check passed.
 

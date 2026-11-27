@@ -85,6 +85,11 @@
     "pi-claude-cli/claude-opus-5-5",
     "pi-claude-cli/claude-fable-5-1"
   ],
+  "contextMode": {
+    "excludeTools": [
+      "subagent"
+    ]
+  },
   "steeringMode": "one-at-a-time",
   "editorPaddingX": 1,
   "showHardwareCursor": false

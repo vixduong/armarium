@@ -15,7 +15,7 @@ Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows
   there is none; claude/windows/README.md).
 - Drops: ALLOWED_DROPS in hooks/agent-no-downgrade equals the "<tier> /" entries of agent-tuning.md's "Drop when" column.
 - pi (warnings only): ~/.pi/agent/settings.json exists but its packages do not include this repo's pi/, or its
-  subagents.agentOverrides differ from pi/settings.example.json.
+  subagents.agentOverrides or contextMode differ from pi/settings.example.json.
 - Twins (warning only): claude/common/CLAUDE.md or pi/AGENTS.md is staged without the other.
 The last line counts the self-tests and those that printed a line starting with "skip".
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
@@ -292,6 +292,12 @@ if not REPO_ONLY and os.path.isfile(os.path.join(pi_pkg, "package.json")) and os
             if tier(example.get(name)) != tier(live.get(name)):
                 print("WARN pi tier of %s differs: pi/settings.example.json has %s, %s has %s" % (
                     name, tier(example.get(name)), pi_settings, tier(live.get(name))))
+    # contextMode.excludeTools decides which tool results arrive whole (subagent): the same on both sides
+    example_all = settings.get("pi/settings.example.json")
+    wanted = example_all.get("contextMode") if isinstance(example_all, dict) else None
+    if wanted is not None and wanted != (pi_live.get("contextMode") if isinstance(pi_live, dict) else None):
+        print("WARN pi contextMode differs: pi/settings.example.json has %s, %s has %s" % (
+            json.dumps(wanted, sort_keys=True), pi_settings, json.dumps(pi_live.get("contextMode") if isinstance(pi_live, dict) else None, sort_keys=True)))
 
 # Twins: claude/common/CLAUDE.md and pi/AGENTS.md carry the same rules (CLAUDE.md of this repo). Under pre-commit, a commit
 # that stages one alone gets a warning; a one-sided edit can be right, so it is not a problem.

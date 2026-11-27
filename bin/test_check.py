@@ -227,6 +227,12 @@ case("pi tiers differ from the example: a warning that names the agent", 0, "WAR
 case("pi settings with subagents: null do not break the gate", 0, "check: ok", absent="Traceback",
      files=dict(PI_PKG, **{"pi/settings.example.json": EXAMPLE}),
      home_files={".pi/agent/settings.json": json.dumps({"packages": ["{HOME}/../repo/pi"], "subagents": None})})
+case("pi contextMode differs from the example: a warning", 0, "WARN pi contextMode differs",
+     files=dict(PI_PKG, **{"pi/settings.example.json": json.dumps({"contextMode": {"excludeTools": ["subagent"]}})}),
+     home_files={".pi/agent/settings.json": json.dumps({"packages": ["{HOME}/../repo/pi"]})})
+case("pi contextMode matches the example: no warning", 0, "check: ok", absent="WARN",
+     files=dict(PI_PKG, **{"pi/settings.example.json": json.dumps({"contextMode": {"excludeTools": ["subagent"]}})}),
+     home_files={".pi/agent/settings.json": json.dumps({"packages": ["{HOME}/../repo/pi"], "contextMode": {"excludeTools": ["subagent"]}})})
 case("pi tiers match the example, home path aside: no warning", 0, "check: ok", absent="WARN",
      files=dict(PI_PKG, **{"pi/settings.example.json": EXAMPLE}), home_files={".pi/agent/settings.json": overrides("opus")})
 
