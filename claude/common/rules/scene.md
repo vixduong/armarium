@@ -5,7 +5,7 @@ paths:
 ---
 # Scene gate
 A picture drawn by code: a 3D or WebGL scene, an illustration, a shader or generative background. The look is the deliverable: steps 1–5 are its acceptance check and come before the scene's systems (clock, weather, controls, interaction), which then take the Code flow. There is no toolchain skill.
-The user gives a reference video or link → suggest `/video-ref <link>` (frames per scene, contact sheet, style notes).
+The user gives a reference video, link or web page → suggest `/video-ref <link>` (frames, contact sheet, style notes; `--page` for a web page: what moves and what the scene is made of).
 
 1. **Reference pack** — before the first line of code: the reference images or frames saved in the repo's design reference folder (none → `docs/reference/<name>/`), and one sentence naming the target look: painted, low-poly or photoreal, one of them. No reference → ask the user for one; they have none → render 2–3 looks of the largest element and build the one they pick. Done when the plan names the pack's paths and that sentence.
 2. **Medium** — before building, name the cheapest medium that reaches the target look: a pre-rendered video loop · painted layers with parallax and shader overlays · an authored vector animation (Rive, Lottie) · 3D with authored models and textures · 3D from code alone. The brief rules out the medium its look needs (no textures, yet "natural") → tell the user before the first line.
