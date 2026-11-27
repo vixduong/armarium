@@ -46,7 +46,7 @@ if not os.path.isfile(new):
 keep = tempfile.TemporaryDirectory()  # removed when the script ends
 old_dir = keep.name
 old = os.path.join(old_dir, os.path.basename(args.hook))
-for name in (os.path.basename(args.hook), "path_only.py"):  # the hook, and the module some hooks import from their own folder
+for name in (os.path.basename(args.hook), "path_only.py", "fold_formats.py"):  # the hook, and the modules hooks import from their own folder
     p = subprocess.run(["git", "-C", args.repo, "show", "%s:%s/%s" % (args.ref, os.path.dirname(args.hook), name)], capture_output=True)
     if p.returncode == 0:
         with open(os.path.join(old_dir, name), "wb") as f:

@@ -251,6 +251,22 @@ case("pi/AGENTS.md staged without CLAUDE.md: a warning", 0, "WARN pi/AGENTS.md i
 case("both staged: no warning", 0, "check: ok", absent="WARN", files=TWIN, pre=stage("claude/common/CLAUDE.md", "pi/AGENTS.md"))
 case("neither staged: no warning", 0, "check: ok", absent="WARN", files=TWIN, pre=stage("claude/common/CODING_STANDARDS.md"))
 
+# a file added with git add -N is in the work tree bin/check reads, but a commit leaves it out
+def stage_ita(staged, ita):
+    def pre(repo):
+        stage(*staged)(repo)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        subprocess.run(["git", "-C", repo, "add", "-N", "--", ita], check=True, env=env)
+    return pre
+ITA = dict(TWIN, **{"claude/common/hooks/test_new.py": "print('ok')\n"})
+case("an intent-to-add file beside a staged one fails the gate", 1, "claude/common/hooks/test_new.py is intent-to-add",
+     files=ITA, pre=stage_ita(["claude/common/CLAUDE.md", "pi/AGENTS.md"], "claude/common/hooks/test_new.py"))
+case("an intent-to-add file with nothing staged passes", 0, "check: ok", files=ITA, pre=stage_ita([], "claude/common/hooks/test_new.py"))
+# git -z prints raw UTF-8 paths: D-stroke is C4 90, and 0x90 has no cp1252 character
+DSTROKE = "docs/" + chr(0x110) + ".md"
+case("an intent-to-add file with a non-ASCII name is named, no traceback", 1, "is intent-to-add", absent="Traceback",
+     files=dict(TWIN, **{DSTROKE: "x\n"}), pre=stage_ita(["claude/common/CLAUDE.md", "pi/AGENTS.md"], DSTROKE))
+
 # a self-test that hangs must not hang the commit: it is cut off and reported
 case("a self-test that hangs is cut off and fails the gate", 1, "test_hang.py timed out", env={"CHECK_TEST_TIMEOUT": "1"},
      files={"claude/common/hooks/test_hang.py": "import time\ntime.sleep(30)\n"})

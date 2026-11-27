@@ -7,6 +7,7 @@ sys.stdout.reconfigure(encoding="utf-8")  # the checks print ✓; a cp1252 conso
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, 'session_audit.py')
 FOLD = 'ctx_search({queries:["x"], source:"s1"}) searches the whole ' 'output (5000 B).'  # split: write-fold-guard refuses the whole phrase
+STORED = 'The full output (5758 B) is stored as s3b; above is the ' 'best-matching part.'  # context-mode's Read fold
 
 
 def asst(req, model, tool, tid, cr=0, cw=0, inp=0, out=0):
@@ -46,7 +47,7 @@ advised['message']['usage']['iterations'] = [  # an advisor call: billed at its 
     {'type': 'advisor_message', 'model': 'claude-opus-5-5', 'input_tokens': 1_000_000, 'output_tokens': 0},
     {'type': 'advisor_message', 'model': 'claude-unknown-9', 'input_tokens': 5}, {'type': 'advisor_message', 'model': 'claude-unknown-9'}]
 srows = [asst('s1', 'claude-sonnet-5-5', 'Bash', 'b1', cr=20000), result('b1', FOLD),
-         asst('s2', 'claude-sonnet-5-5', 'Bash', 'b2', cr=21000), advised]
+         asst('s2', 'claude-sonnet-5-5', 'Bash', 'b2', cr=21000), result('b2', STORED), advised]
 open(sub, 'w').write('\n'.join(json.dumps(r) for r in srows) + '\n')
 json.dump({'agentType': 'worker', 'description': 'fix it'}, open(sub[:-6] + '.meta.json', 'w'))
 
@@ -68,7 +69,7 @@ check('main plugin calls', m.get('plugin_calls') == {'context-mode': 1, 'cbm': 1
 check('main folds', m.get('folds') == 1, m.get('folds'))
 parts = m.get('usd_parts') or {}
 check('cost parts add up', parts and abs(sum(parts.values()) - m.get('usd', -1)) < 0.011, parts)
-check('subagent folds, no plugin calls', s.get('folds') == 1 and s.get('plugin_calls') == {}, (s.get('folds'), s.get('plugin_calls')))
+check('subagent folds (a ctx_search pointer, a stored-output notice), no plugin calls', s.get('folds') == 2 and s.get('plugin_calls') == {}, (s.get('folds'), s.get('plugin_calls')))
 check('subagent first-request context', s.get('ctx0') == 20000, s.get('ctx0'))
 check('advisor calls priced at their own model', s.get('advisor_usd') == 4.0, s.get('advisor_usd'))
 check('advisor tokens and model are counted', s.get('tokens', {}).get('input_tokens') == 1_000_005 and s.get('models', {}).get('opus-5-5') == 1, (s.get('tokens'), s.get('models')))

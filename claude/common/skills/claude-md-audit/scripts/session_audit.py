@@ -34,7 +34,8 @@ PATTERNS = {
     'hook_fail': r'the hook failed|the hook did not finish',
     'fold': r'ctx_search\(',
 }
-FOLD = re.compile(r'searches the whole output|ctx_search\(\{queries')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'hooks'))  # ~/.claude/hooks, or claude/common/hooks in the repo
+from fold_formats import CTX_FOLD as FOLD  # the list write-fold-guard refuses; rtk folds are not context-mode's
 PLUGINS = {'mcp__plugin_context-mode_': 'context-mode', 'mcp__codebase-memory-mcp__': 'cbm'}
 # A block the harness reported, not hook source or a probe's output that prints the word. Code Mode shows one block twice
 # (the nested call and its REPL event), so blocks are counted by distinct message: the same command blocked twice counts once.

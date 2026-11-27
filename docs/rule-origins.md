@@ -217,6 +217,17 @@ Two sibft sessions, 2026-11-25 and 26: a PowerShell fix ($1.98) and a two-day wa
 | `general-purpose` tier (`agent-tuning.md`) | The table had no row for it. Spec writers ran on sonnet one day and on opus the next, $62.31 on opus, and the first review still found 6 P0 | ebf9a37f lines 4169, 5421, 6547 | New row: inherits the main model; sonnet / high for prose against settled decisions; opus / high when the text decides money, migration or a public contract |
 | ripgrep on Windows (machine) | `rg` was missing: 1 failure in 0a8a49a6, 8 in ebf9a37f | ebf9a37f lines 257-271 | Installed with winget (ripgrep 16.0.0); CLAUDE.md still routes text search to `git grep -n` |
 
+## Changed after the 4b447451 retro (2026-11-27)
+
+The session that applied the audit fixes above, pulled upstream's new layout mid-task and re-applied them.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Review range (`CLAUDE.md` and `pi/AGENTS.md` Subagents, Prompt) | Two opus reviews of an uncommitted diff came back half done: the main ran `git pull` and `stash apply` while they read the work tree | 4b447451, reviewer and security agents (34,234 and 35,683 tokens) | Uncommitted work goes in as the SHA `git stash create` prints, so later edits leave the range fixed |
+| Intent-to-add (`bin/check`) | `test_write_fold_guard.py` was staged as an empty intent-to-add entry; pre-commit passed because `bin/check` reads the work tree, and the commit would have left the test out | the review of 4b447451 (blob `e69de29`) | With anything staged, a `git add -N` file fails the gate |
+| One fold list (`hooks/fold_formats.py`) | context-mode's new Read fold ("is stored as …") reached `write-fold-guard` only; `session_audit.py` kept its own pattern and stopped counting it | the first review of 4b447451 (P1 and P2) | Both import the list from `hooks/fold_formats.py`; the audit self-test has a stored-output fold |
+| Plan file current (Code Done-when) | The review-fix round never reached the plan file, which still named the old `claude/hooks/` paths, yet the Exit gave the plan item ✓ | 4b447451 `plan.md` | The item asks for a plan file current with the last fix round |
+
 ## Changed by the owner's choice (2026-11-27)
 
 | Rule (where) | What happened | Evidence | Change |
