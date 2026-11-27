@@ -3,8 +3,8 @@
   "defaultTools": [
     "+codemode"
   ],
-  "defaultProvider": "opencode-go",
-  "defaultModel": "deepseek-v4.1-flash",
+  "defaultProvider": "pi-claude-cli",
+  "defaultModel": "claude-sonnet-5-5",
   "defaultThinkingLevel": "high",
   "packages": [
     {
@@ -35,9 +35,6 @@
     "!triage"
   ],
   "subagents": {
-    "defaultProvider": "opencode-go",
-    "defaultModel": "deepseek-v4.1-flash",
-    "defaultThinking": "high",
     "agentOverrides": {
       "scout": {
         "model": "pi-claude-cli/claude-haiku-5-5",
@@ -73,12 +70,7 @@
   },
   "tuiMode": "fullscreen",
   "enabledModels": [
-    "opencode-go/deepseek-v4.1-flash",
-    "opencode/deepseek-v4.1-flash",
     "deepseek/deepseek-flash",
-    "opencode-go/glm-5.3-flash",
-    "opencode/glm-5.3-flash",
-    "opencode-go/hy4-flash-free",
     "opencode/gpt-6-astra",
     "pi-claude-cli/claude-haiku-5-5",
     "pi-claude-cli/claude-sonnet-5-5",
