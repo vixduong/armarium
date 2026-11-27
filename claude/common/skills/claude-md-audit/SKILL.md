@@ -27,7 +27,7 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
    - A judgement failure gets one sentence, in the single place that owns that rule.
    - Two instructions that conflict get resolved in one of them, never both.
    - A fix whose gain and cost only a run can weigh (a plugin, a hook, a model or effort choice) → an A/B kit under `~/projects/armarium-audits/evals/`, run with `/eval-kit`; the kit's verdict decides, not the audit.
-   - Evidence from one session (n = 1) goes under "Still open", not into a rule. Once the user has the report, each such item becomes an issue: `gh issue create --repo vixduong/armarium --label audit`.
+   - Evidence from one session (n = 1) goes under "Still open", not into a rule. Once the user has the report, each such item becomes an issue: `gh issue create --repo vixduong/armarium-audits --label audit`.
 
 7. **Report** to `/Users/Shared/claude-evals/session-<id8>/report.md`, never inside the project repo. Sections in this order:
    - outcome and cost table
@@ -71,4 +71,4 @@ Four groups, each a question the report answers; a group with any ✗ answers no
 - **Conflicts**: a skill step against a CLAUDE.md step (e.g. `/implement` → `code-review` vs step 8). Note which one the agent followed.
 - **Memory**: memory files in `loaded` carry the frontmatter CLAUDE.md `## Context` asks for. A decision the session made that no memory file or ADR holds is a missed save; a memory restating what the repo holds is load to cut.
 - **Never triggered** (two or more sessions): rules, agents, hooks or plugin tools with zero hits. These are candidates for retro's no-ops category.
-- **Open issues**: `gh issue list --repo vixduong/armarium --label audit --state open`, each one against this session. Seen again → comment with the evidence; a second session moves it out of "Still open" into a proposed fix. The session ran under its fix → say whether the fix held, and close it if it did. Else n/a.
+- **Open issues**: `gh issue list --repo vixduong/armarium-audits --label audit --state open`, each one against this session. Seen again → comment with the evidence; a second session moves it out of "Still open" into a proposed fix. The session ran under its fix → say whether the fix held, and close it if it did. Else n/a.
