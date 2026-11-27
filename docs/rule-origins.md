@@ -248,6 +248,17 @@ A sign-in screen got a Three.js schoolyard behind it. The code passed every chec
 | `review-animations` judges UI motion (`rules/frontend.md` step 6) | The skill checks durations, easing and origin of UI transitions. Called on the scene, it had nothing to say about stiff figures | b8d423e5, the `review-animations` call at 776 | Step 6 names UI animation; a scene's motion is scene gate step 6 |
 | The gate names no Three.js skill (`rules/scene.md`) | Six public skill repos were checked: none takes the owner's reference or compares a render with it | `docs/scene-gate-research.md` | The gate stands alone and ends with four technique links |
 
+## Changed after the 42fdba2c session audit
+
+One brief ("Floating Island": three.js, one file, no questions) ran three ways: with this config (42fdba2c), bare under `claude -p --safe-mode` (abf57a18), and in Claude Design. Report: `/Users/Shared/claude-evals/session-42fdba2c/report.md` (local).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| No-questions branch for the reference pack (`rules/scene.md` step 1) | The brief gave no reference and barred questions. Step 1 only said to ask, so the run skipped the pack and the trial looks, and its Exit showed 4 ✗ on the Scene row | 42fdba2c: the Scene block of the final reply; `docs/plan.md` of the app, "Reference pack: none given" | Questions barred or headless → the agent picks one of the trial looks, records why, and uses its still as the reference for steps 4 and 5 |
+| Code flow starts after the first look review (Scene row, `CLAUDE.md` and `pi/AGENTS.md`) | `lean-build` and `tdd` were called at 17:19 and the logic tests written at 17:31. The first hero still was viewed at 17:38 | 42fdba2c transcript lines 109, 140 and 328 | The row's Flow cell says Code flow and its track skill start after step 5's first look review |
+| Re-check after the closing look review (`rules/scene.md` step 5) | The second look review returned 3 P1s and "Verdict: BLOCK". The run fixed them, checked its own screenshots and wrote "✓ Every P0/P1 fixed". A render made for the audit still shows the mist away from the waterfall | the final message of subagent `a4406069`; `shots/A-1day.png` and `shots/A-9orbit.png` in the report folder | A P1 from the closing call gets one re-check of those P1s only; one it still finds stays ✗ in Exit |
+| A Big diff names its contract (Code Done-when, `CLAUDE.md` and `pi/AGENTS.md`) | Step 1 skips the plan when a brief is the contract, while Done-when asked for a plan file on every Big diff. The run wrote `docs/plan.md` 7 minutes after its first code | 42fdba2c transcript lines 160 (17:31:19) and 274 (17:38:13) | Done-when names the contract: the spec, ticket or plan that step 1 was given, else the plan file |
+
 ## Still open
 
 Open findings are GitHub issues with the label `audit`: `gh issue list --repo vixduong/armarium --label audit`. Every `/claude-md-audit` run re-checks them against its session (the "Open issues" check of the skill) and files its own one-session findings there.
