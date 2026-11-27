@@ -70,6 +70,7 @@ def main():
         return 0
 
     # The rtk PreToolUse hook rewrites these into compact `rtk ...` forms, so blocking here only costs a turn.
+    # A Code Mode REPL call skips rtk (run_cli_hook.from_repl) and runs them raw on purpose: a script reads the output.
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves the script dir off sys.path
     sys.dont_write_bytecode = True  # no __pycache__ in the hooks folder (install.ps1 would copy it)
     from run_cli_hook import resolve

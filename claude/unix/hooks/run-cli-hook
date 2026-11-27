@@ -12,6 +12,9 @@
 # unpredictable places. We probe the known install dirs instead; ~/.headroom/bin is
 # not one of them, so name its rtk with CCT_RTK_BIN.
 #
+# A Code Mode REPL call (tool_use_id repl_...) goes through untouched: a script parses
+# its output, which rtk would condense. Self-test: python3 -I test_run_cli_hook.py
+#
 # A missing binary is NOT an error: these hooks are optional accelerators, so we
 # exit 0 and let the tool call through rather than blocking work on a tool the
 # user may have deliberately skipped.
@@ -115,6 +118,11 @@ resolve_cli() {
 
 if BIN_PATH=$(resolve_cli "$BIN"); then
   [ "$WHICH" -eq 1 ] && { printf '%s\n' "$BIN_PATH"; exit 0; }
+  if [ ! -t 0 ]; then
+    input=$(cat)
+    [[ $input =~ \"tool_use_id\"[[:space:]]*:[[:space:]]*\"repl_ ]] && exit 0
+    exec "$BIN_PATH" "$@" <<<"$input"
+  fi
   exec "$BIN_PATH" "$@"
 fi
 

@@ -3,8 +3,19 @@
 # then run it with stdin and the remaining args. A missing binary is not an error: exit 0 and let the tool call through.
 #   python run_cli_hook.py <bin> [args...]   run <bin>, passing stdin, stdout, stderr and the exit code through
 #   python run_cli_hook.py --which <bin>     print the resolved path, exit 1 if unresolvable
-# cbm_session_reminder.py imports resolve() from here. Self-test: python -I test_bash_ban_raw_tools.py
-import os, subprocess, sys
+# A Code Mode REPL call (tool_use_id repl_...) goes through untouched: a script parses its output, which rtk would condense.
+# cbm_session_reminder.py imports resolve() from here. Self-tests: python -I test_run_cli_hook.py, test_bash_ban_raw_tools.py
+import json, os, subprocess, sys
+
+
+def from_repl(data):
+    """True for a hook input whose tool call came from a Code Mode REPL script."""
+    if b"repl_" not in data:  # the hot path: every Bash call
+        return False
+    try:
+        return str(json.loads(data).get("tool_use_id", "")).startswith("repl_")
+    except (ValueError, AttributeError):
+        return False
 
 
 def resolve(name):
@@ -51,6 +62,8 @@ def main(argv):
         print(b)
         return 0
     data = sys.stdin.buffer.read()  # bytes: no code-page decoding on the way through
+    if from_repl(data):
+        return 0
     return subprocess.run([b] + rest[1:], input=data).returncode
 
 

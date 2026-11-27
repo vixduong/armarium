@@ -68,6 +68,7 @@ fi
 
 # The rtk PreToolUse hook rewrites cat/head/tail/grep/rg/wc/find into compact `rtk ...` forms
 # (measured 2026-11-13). Blocking here only cost the agent a turn, so defer to rtk when it resolves.
+# A Code Mode REPL call skips rtk (run-cli-hook) and runs these raw on purpose: a script reads the output, not the model.
 if "$HOME/.claude/hooks/run-cli-hook" --which rtk >/dev/null 2>&1; then
   exit 0
 fi
