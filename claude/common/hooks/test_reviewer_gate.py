@@ -1,5 +1,6 @@
 """Self-test for reviewer-gate: python3 -I ~/.claude/hooks/test_reviewer_gate.py"""
 import json, os, subprocess, sys, tempfile
+os.environ.pop("GIT_INDEX_FILE", None)  # a path-limited `git commit` exports it to its pre-commit hook; the temp repos here need their own index
 sys.stdout.reconfigure(encoding="utf-8")
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reviewer-gate")  # the hook beside this test

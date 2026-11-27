@@ -1,6 +1,7 @@
 """Self-test for flow-skill-check: python3 -I ~/.claude/hooks/test_flow_skill_check.py
 Runs the hook under a temporary HOME whose ~/.claude/skills holds only tdd and lean-build."""
 import atexit, json, os, shutil, subprocess, sys, tempfile
+os.environ.pop("GIT_INDEX_FILE", None)  # a path-limited `git commit` exports it to its pre-commit hook; the temp repos here need their own index
 sys.stdout.reconfigure(encoding="utf-8")  # failure lines quote ✓ and ✗; a Windows console is cp1252
 
 FAKE_HOME = tempfile.mkdtemp()
