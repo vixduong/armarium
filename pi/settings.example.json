@@ -63,7 +63,7 @@
       },
       "reviewer": {
         "model": "pi-claude-cli/claude-opus-5-5",
-        "thinking": "medium"
+        "thinking": "high"
       },
       "oracle": {
         "model": "pi-claude-cli/claude-fable-5-1",

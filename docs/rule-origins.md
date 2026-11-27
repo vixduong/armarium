@@ -235,6 +235,7 @@ The session that applied the audit fixes above, pulled upstream's new layout mid
 |---|---|---|---|
 | `worker` tier (`agent-tuning.md`, `agents/worker.md`, `pi/settings.example.json`) | Raised from sonnet / medium by the owner's choice, not by a measurement | the owner's request in session 4b447451 | Default sonnet / high; the haiku drop for mechanical edits stays |
 | `reviewer` tier (`agent-tuning.md`, `agents/reviewer.md`, pi) | Raised from sonnet / high by the owner's choice, not by a measurement (upstream 8c62930). On sonnet, `medium` rated a real crash P2 where `high` rated it P1, so watch for the same on opus | reviewer-cmp, 2026-11-12 | Default opus / medium; high when an opus/medium review missed a bug or the diff is hard to undo |
+| `reviewer` effort (`agent-tuning.md`, `CLAUDE.md` step 8, `pi/AGENTS.md`, `pi/settings.example.json`) | The main session runs at effort high while its reviewer ran at medium, one level below the code it judged; the owner flagged it | the owner's messages in session 4b447451 | Default stays opus / medium; a reviewer runs at least at the main session's effort, and one level above that when a review missed a bug or the diff is hard to undo. pi sets thinking only in settings, so its reviewer is pinned at the example's `defaultThinking` (high) |
 
 ## Still open
 
