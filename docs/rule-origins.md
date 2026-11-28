@@ -167,6 +167,7 @@ A wayfinder + bug-fix session on 2026-11-19 in a private Spring workspace ($11.1
 | What | Why |
 |---|---|
 | `agents/codebase-memory.md`, `-auditor.md`, `-scout.md` | 0 calls in 254 local session transcripts |
+| `agents/tester.md`, `agents/evidence-auditor.md` | Issue #12: 0 calls in sessions 09dd1875 and 42fdba2c and in the 18 sessions of the lean-config-v1 kit, where every `Agent` call was `reviewer`. `explorer` stays |
 
 ## Changed after the Floating Island eval
 
@@ -268,6 +269,15 @@ The retro of this session found that `claude/common/CLAUDE.md` only grew. Plan: 
 |---|---|---|---|
 | Size cap on the twin files (`bin/check`, `bin/test_check.py`) | `claude/common/CLAUDE.md` was 16,812 bytes and `pi/AGENTS.md` 17,160 at commit `108b9e3`; 96 rows under "## Changed" headings and 1 row under "## Removed" sit in this file, so rules went in and almost none came out | `docs/plan-lean-config.md` Baseline; `grep -c` of the rows in this file | `bin/check` fails when either file is over its cap (16,900 and 17,200 bytes, counted after `\r` is removed): a sentence added then needs one merged or removed, or a cap edit that shows in the diff |
 | The audit proposes removals (`claude-md-audit` steps 6 and 7, Never triggered check) | The audit only added rules; its fixes never named a sentence to merge or drop | 3822f333: the retro's finding that no step of the skill removes a rule | A fix that adds a sentence names the one it merges with or replaces; a rule with one session as evidence, 5 audits old and named by no later report is a removal candidate; the report gains "what to remove" |
+
+## Changed after the lean-config-v1 kit (2026-11-28)
+
+The kit ran the installed `CLAUDE.md` against a 48-line version, 9 opus sessions each, on three one-file tasks. Results: `~/projects/armarium-audits/evals/lean-config-v1/results/summary.md`. The rule frozen in its `PLAN.md` gives: keep the installed file and prune it (`docs/plan-lean-config.md` step 5b).
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| The installed file stays (`claude/common/CLAUDE.md`, `pi/AGENTS.md`) | Both arms passed all 15 checks in 3 of 3 runs, and every post-hoc review found 0 P1. The 9 lean sessions cost 37.62 USD against 54.97, but on the share-link task the lean median was 84% of the full one, over the 80% the rule asks for on every task | the kit's `results/summary.md` and `results/runs.tsv` | The Route table and the Code flow stay; the prunes are the next row and the new row under "## Removed" |
+| Small tier for prose and reports (Report and Writing rows, the `humanizer` sentence under the Route table) | Issue #4: two short reports and a one-sentence README edit each wrote ✗ for `reviewer` or `humanizer`; the step was skipped every time | 09dd1875 (one session); the thresholds were picked in session 3822f333 | `humanizer` is owed for over one paragraph of prose; a report's `reviewer` call for over 40 lines or more than one source. Each twin file grew 25 bytes, so the caps stay |
 
 ## Still open
 

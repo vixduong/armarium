@@ -104,6 +104,8 @@ Cost: 18 sessions. The one full-config scene build measured so far cost 18.58 US
 
 `/eval-kit lean-config-v1` (user-only). Its step 6 applies the decision rule to `results/summary.md`. The kit's verdict settles the general-versus-detailed question: `claude-md-audit` step 6 sends a fix whose gain and cost only a run can weigh to a kit.
 
+Result, 2026-11-28: 18 of 18 sessions scored. The session ran the batch itself on the owner's instruction, without `/eval-kit`. Rule 1: no check lost. Rule 2 failed on task `u` (median 2.03 against 2.42 USD, ratio 0.84). Verdict: rule 3, so step 5b. Done from 5b: issue #12 (`tester` and `evidence-auditor` cut, `explorer` kept) and issue #4 (`humanizer` for over one paragraph; a report's `reviewer` for over 40 lines or more than one source). Both went into one change and each twin file grew 25 bytes, so the caps stayed: a deviation from 5b's "one decision at a time, lowering the cap with each". `## Tools` waits on issues #15, #16 and #19.
+
 ## Step 5: apply the verdict
 
 5a, `lean` adopted. Order on the live tree: readers first, then the file.

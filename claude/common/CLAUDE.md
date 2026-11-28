@@ -11,15 +11,15 @@ Write `Flow: <row>` before the first tool call (a question answered in chat need
 | UI in a repo: page, component, canvas or WebGL tool | Code flow + `~/.claude/rules/frontend.md` | none required; design skills optional per frontend gate | every width and state frontend gate step 4 lists shot and viewed; one missing → ✗ · motion in the diff → `review-animations` ran, Small included |
 | Scene by code in a repo: 3D or WebGL scene, illustration, shader or generative background | `~/.claude/rules/scene.md`: the look first; Code flow and its track skill start for the scene's systems after step 5's first look review | none; a reference video or link → suggest `/video-ref` | the reference pack's paths and the target look named · the hero still and the reference viewed in one call, every named element judged · a look-only `reviewer` call saw both: its P1s fixed, P2s listed · a frame strip viewed for each moving element |
 | Artifact (published with the Artifact tool, no repo): page, dashboard | Deliverable flow + frontend gate items 4, 5, 7 | `artifact-design`; chart or stat tile → `dataviz` | published, and the rendered page viewed at 375 px and desktop |
-| Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated · a `reviewer` call re-derived the headline numbers and claims from the raw data |
-| Writing, doc, message | Deliverable flow | `humanizer` on the final text | the intake note names reader and purpose (`file:line` or the message that says it); `humanizer` ran on the version delivered |
+| Report, analysis | Deliverable flow | chart → `dataviz` | every number traces to source + calculation; totals reconcile; unit, period, exclusions stated · over 40 lines or more than one source → a `reviewer` call re-derived the headline numbers and claims from the raw data |
+| Writing, doc, message | Deliverable flow | over one paragraph → `humanizer` | the intake note names reader and purpose (`file:line` or the message that says it); over one paragraph → `humanizer` ran on the version delivered |
 | Agent docs: CLAUDE.md, skill, agent `.md`, prompt | Deliverable flow | `writing-for-agents` | every pointer target `ls`-verified; `wc -l` no higher than before, or the growth and its reason stated · `git diff` removes only lines you meant to remove |
 | Research | Deliverable flow | `research`, or `researcher` agent | each decision-relevant claim cites a source you opened; unverified claims listed |
 | Question answered in chat, no file change | answer directly | a fact a source holds (the repo's code, a library or version, a price, Claude itself) → that source first: read the code; docs per `## Tools`; `claude-api`; Claude Code → `claude <cmd> --help` first, then `claude-code-guide` agent; else WebSearch. General knowledge → answer | each such claim comes from a source opened this session, or the answer marks it unchecked |
 | Video | rendered by code → Code flow as `~/.claude/rules/video.md` adapts it; else Deliverable flow | by code → its toolchain skill per `~/.claude/rules/video.md` (read it before the first line); design skills optional · code review → `review-animations` | output probed · no blank frame · one frame per transition viewed · reading time fits every scene |
 | Claude Code settings, hooks, permissions | `update-config` | `update-config` | settings file parses (`jq empty`) |
 
-Every row whose output has prose a person reads (report, page, doc, message) also ends with `humanizer` on the delivered version.
+Every row whose output has over one paragraph of prose a person reads (report, page, doc, message) also ends with `humanizer` on the delivered version.
 **Exit**: every final reply except a chat answer, a short bug-fix reply included, lists the row's Done-when items, each ✓ with its evidence (command, `file:line`, skill call) or ✗ with the reason; an item with any exception is ✗, the exception its reason. A skill's evidence is its `Skill` tool call after the `Flow:` line that names it, or the user's `/skill` command that started the task; a name in the `Flow:` line is not a call. A lead skill left out appears there as ✗.
 
 ## Principles
@@ -77,7 +77,7 @@ Main = coordinator: integrates + verifies. Agents pin `model`+`effort`; changing
 - **Parallel**: max 3; serial if dependent or same file; risky parallel writes → `isolation: worktree`.
 - **Wait**: next step needs the result → run the agent in the foreground. `ScheduleWakeup` belongs to `/loop` only.
 - **Prompt**: self-contained, <500 tok: goal + named files/symbols + constraint + acceptance check + return format. A diff goes in as a range the agent runs (`git diff <base> <sha>`; uncommitted work → the SHA `python3 -I ~/.claude/bin/snapshot.py` (Windows: `python`) prints, so later edits leave the range fixed), never pasted: output hooks shorten pasted text. A claim resting on a web page → save the page to the scratchpad and name its path: `reviewer` and `oracle` have no web tool.
-- **Pick** by description: `explorer` over `Explore`; `Plan` = steps, `oracle` = decisions (~once per run, own Fable limit); `evidence-auditor` before a decision rests on `researcher` claims.
+- **Pick** by description: `explorer` over `Explore`; `Plan` = steps, `oracle` = decisions (~once per run, own Fable limit).
 - **Report = claim**: check the diff, re-run cited evidence, confirm the acceptance check passed.
 
 ## Replies

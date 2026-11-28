@@ -8,7 +8,6 @@ BLOCK = [
     {"subagent_type": "reviewer", "model": "haiku"},
     {"subagent_type": "reviewer", "model": "claude-haiku-5-5"},
     {"subagent_type": "reviewer", "model": "sonnet"},     # below its opus default, and no listed drop
-    {"subagent_type": "evidence-auditor", "model": "haiku"},
     {"subagent_type": "oracle", "model": "haiku"},
 ]
 ALLOW = [

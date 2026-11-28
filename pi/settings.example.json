@@ -51,13 +51,6 @@
         "model": "pi-claude-cli/claude-sonnet-5-5",
         "thinking": "high"
       },
-      "evidence-auditor": {
-        "model": "pi-claude-cli/claude-sonnet-5-5",
-        "thinking": "medium",
-        "subagentOnlyExtensions": [
-          "/Users/YOU/.pi/agent/npm/node_modules/pi-web-access/dist/index.js"
-        ]
-      },
       "reviewer": {
         "model": "pi-claude-cli/claude-opus-5-5",
         "thinking": "high"
