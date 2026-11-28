@@ -311,5 +311,15 @@ case("pi/package.json names an extension that is not there", 1, "gone.ts", files
 case("pi/package.json names an extension that exists: passes", 0, "check: ok",
      files={"pi/package.json": json.dumps({"pi": {"extensions": ["./ext/index.ts"]}}), "pi/ext/index.ts": "export default () => {}\n"})
 
+# CLAUDE.md and pi/AGENTS.md have a byte cap (bin/check's SIZE_CAPS), counted after \r is removed. The CRLF case gains a \r on Windows text mode and is still CAP bytes after stripping.
+CAP = int(re.search(r'"claude/common/CLAUDE.md": (\d+)', open(CHECK, encoding="utf-8").read()).group(1))
+case("CLAUDE.md one byte over its cap fails", 1, "claude/common/CLAUDE.md is %d bytes, over its %d cap" % (CAP + 1, CAP),
+     files={"claude/common/CLAUDE.md": "a" * (CAP + 1)})
+PI_CAP = int(re.search(r'"pi/AGENTS.md": (\d+)', open(CHECK, encoding="utf-8").read()).group(1))
+case("pi/AGENTS.md one byte over its cap fails", 1, "pi/AGENTS.md is %d bytes, over its %d cap" % (PI_CAP + 1, PI_CAP),
+     files={"pi/AGENTS.md": "a" * (PI_CAP + 1)})
+case("CLAUDE.md exactly at its cap passes", 0, "check: ok", files={"claude/common/CLAUDE.md": "a" * CAP})
+case("CLAUDE.md at its cap in CRLF passes", 0, "check: ok", files={"claude/common/CLAUDE.md": "a" * (CAP - 1) + "\r\n"})
+
 print("FAILS %d of %d" % (fails, total))
 sys.exit(1 if fails else 0)

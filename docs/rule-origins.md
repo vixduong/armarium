@@ -260,6 +260,15 @@ One brief ("Floating Island": three.js, one file, no questions) ran three ways: 
 | A Big diff names its contract (Code Done-when, `CLAUDE.md` and `pi/AGENTS.md`) | Step 1 skips the plan when a brief is the contract, while Done-when asked for a plan file on every Big diff. The run wrote `docs/plan.md` 7 minutes after its first code | 42fdba2c transcript lines 160 (17:31:19) and 274 (17:38:13) | Done-when names the contract: the spec, ticket or plan that step 1 was given, else the plan file |
 | Audit issues live in the private repo (`claude-md-audit` step 6 and its Open issues check; Still open below) | The skill listed and filed issues in `vixduong/armarium`. The check came back empty while 16 open findings sat in `vixduong/armarium-audits`, and 6 new ones were filed in the public repo before being moved | the audit's `gh issue list` result `[]`; `gh issue list --repo vixduong/armarium-audits --label audit` | All three commands name `vixduong/armarium-audits` |
 
+## Changed after the 3822f333 retro (2026-11-28)
+
+The retro of this session found that `claude/common/CLAUDE.md` only grew. Plan: `docs/plan-lean-config.md`.
+
+| Rule (where) | What happened | Evidence | Change |
+|---|---|---|---|
+| Size cap on the twin files (`bin/check`, `bin/test_check.py`) | `claude/common/CLAUDE.md` was 16,812 bytes and `pi/AGENTS.md` 17,160 at commit `108b9e3`; 96 rows under "## Changed" headings and 1 row under "## Removed" sit in this file, so rules went in and almost none came out | `docs/plan-lean-config.md` Baseline; `grep -c` of the rows in this file | `bin/check` fails when either file is over its cap (16,900 and 17,200 bytes, counted after `\r` is removed): a sentence added then needs one merged or removed, or a cap edit that shows in the diff |
+| The audit proposes removals (`claude-md-audit` steps 6 and 7, Never triggered check) | The audit only added rules; its fixes never named a sentence to merge or drop | 3822f333: the retro's finding that no step of the skill removes a rule | A fix that adds a sentence names the one it merges with or replaces; a rule with one session as evidence, 5 audits old and named by no later report is a removal candidate; the report gains "what to remove" |
+
 ## Still open
 
 Open findings are GitHub issues with the label `audit`: `gh issue list --repo vixduong/armarium-audits --label audit`. Every `/claude-md-audit` run re-checks them against its session (the "Open issues" check of the skill) and files its own one-session findings there.

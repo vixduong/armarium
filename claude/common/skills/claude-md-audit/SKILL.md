@@ -24,15 +24,16 @@ A retrospective on the **config**, not the code: for one or more sessions, find 
 
 6. **Propose fixes.**
    - A mechanical failure (a fixed pattern, a missing ignore, a banned command) gets a hook or check, not prose.
-   - A judgement failure gets one sentence, in the single place that owns that rule.
-   - Two instructions that conflict get resolved in one of them, never both.
+   - A judgement failure gets one sentence, in the single place that owns that rule; a sentence that adds to a rule names the sentence it merges with or replaces. Two instructions that conflict get resolved in one of them, never both.
    - A fix whose gain and cost only a run can weigh (a plugin, a hook, a model or effort choice) → an A/B kit under `~/projects/armarium-audits/evals/`, run with `/eval-kit`; the kit's verdict decides, not the audit.
+   - A removal candidate (any number of sessions): a rule whose row in `docs/rule-origins.md` sits in a `## Changed after …` section with one session as evidence, with 5 or more later sections and no report under `/Users/Shared/claude-evals/session-*/report.md` written after it that names the rule. Every such heading counts as one section; a section's date is the `git log` date of the commit that added its heading. A candidate with no row is listed as "no row".
    - Evidence from one session (n = 1) goes under "Still open", not into a rule. Once the user has the report, each such item becomes an issue: `gh issue create --repo vixduong/armarium-audits --label audit`.
 
 7. **Report** to `/Users/Shared/claude-evals/session-<id8>/report.md`, never inside the project repo. Sections in this order:
    - outcome and cost table
    - checks table: one block per group with its yes/no answer, then every check, its verdict (✓, ✗, n/a) and evidence
    - findings, most severe first, each with evidence (transcript line or `file:line`) and its fix
+   - what to remove: step 6's removal candidates and the Never triggered ones, each with its row in `docs/rule-origins.md`; an empty section says so
    - what worked
    - still open
 

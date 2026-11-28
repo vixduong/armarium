@@ -18,6 +18,7 @@ Layout: claude/common/ is shared; claude/unix/ (macOS, Linux) and claude/windows
 - pi (warnings only): ~/.pi/agent/settings.json exists but its packages do not include this repo's pi/, or its
   subagents.agentOverrides or contextMode differ from pi/settings.example.json.
 - Twins (warning only): claude/common/CLAUDE.md or pi/AGENTS.md is staged without the other.
+- Size: claude/common/CLAUDE.md and pi/AGENTS.md stay within their SIZE_CAPS in bytes, counted after \r is removed; an absent file is skipped.
 - Intent-to-add: with anything staged, a file added with `git add -N` fails, since the commit would leave it out.
 The last line counts the self-tests and those that printed a line starting with "skip".
 - Skills: CLAUDE.md and rules/ tell the model to call no skill that has disable-model-invocation: true,
@@ -36,6 +37,7 @@ UNIX_SETTINGS, WINDOWS_SETTINGS = "claude/unix/settings.example.json", "claude/w
 HOME_DOT = os.path.expanduser("~/.claude")
 PROJECT_FILES = {"CLAUDE.md", "AGENTS.md", "SKILL.md", "README.md", "GLOSSARY.md", "architecture.md"}  # live in other repos
 problems = []
+SIZE_CAPS = {"claude/common/CLAUDE.md": 16900, "pi/AGENTS.md": 17200}  # bytes after \r is removed; raise one in a diff that shows why
 
 
 def rel(p):
@@ -334,6 +336,14 @@ if not REPO_ONLY and all(os.path.exists(os.path.join(REPO, t)) for t in twins):
     for one, other in (twins, twins[::-1]):
         if one in staged and other not in staged:
             print("WARN %s is staged without %s: a rule change in one goes into the other in the same commit" % (one, other))
+
+# Size: a sentence added to a twin needs one merged or removed, or a cap edit that shows in the diff
+for f, cap in SIZE_CAPS.items():
+    if os.path.exists(os.path.join(REPO, f)):
+        with open(os.path.join(REPO, f), "rb") as fh:
+            size = len(fh.read().replace(b"\r", b""))
+        if size > cap:
+            problems.append("%s is %d bytes, over its %d cap: merge or remove a sentence, or raise SIZE_CAPS in bin/check" % (f, size, cap))
 
 # Intent-to-add (git add -N): bin/check reads the work tree, so the file's test passes here while the commit leaves it out.
 if not REPO_ONLY:
